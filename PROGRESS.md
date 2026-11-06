@@ -472,6 +472,18 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
 - `docs/COMPARISON.md`: Windows RflySim vs this project (systems, size, activation, PX4, MATLAB, each tool).
 - README: showcase GIFs at the top, installed command names, Releases link.
 
+## 2026-11-06 — v0.1.0 released, real macOS install, v0.1.1 fix
+- User published release v0.1.0 (6 assets). Downloaded assets match SHA256SUMS and the local build.
+- **First real install of the macOS .pkg** (user clicked through the Installer: unsigned → Gatekeeper "rejected",
+  but a gh download has no quarantine flag, so the Installer opens). Receipt `org.rflysim-mac.rflytools` 0.1.0,
+  `/Library/RflyTools` complete, 10 commands in `/usr/local/bin`, universal ad-hoc signed binaries.
+  From the installed copy: ISO import, coptersim finds the DB, RflyGame mission, rflysim3d, SITLRun all work, and
+  `rfly-flightgear` really launched FlightGear with the imported F450.
+- **Bug:** "Import RflySim Data.app" was missing from /Applications/RflyTools. The Installer *relocated* it into the
+  repo's dev copy (`RflyTools/`, same bundle ID), root-owned. pkgbuild bundles are relocatable by default.
+  Fix: `pkgbuild --analyze` + component plist with `BundleIsRelocatable=false` (all 9 apps), and `xattr -cr` on the
+  payload (it carried `._*` AppleDouble files). Version 0.1.1, commit `f356e8e`.
+
 ## Next steps
 0. When a licensed MATLAB is installed: run the RflyMac install + quicktest + example model. Fix anything MATLAB-specific.
 1. User test-flies in QGC.
