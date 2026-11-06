@@ -766,7 +766,7 @@ mod tests {
         assert!(skew < Duration::from_millis(250), "countdowns agree within {skew:?}");
         // Bob flies a straight line at 10 m/s; Alice's view must be smooth.
         let t0 = Instant::now();
-        let (mut last_send, mut prev, mut max_step, mut raw_jumps) = (0.0, None::<f32>, 0.0f32, 0);
+        let (mut last_send, mut prev, mut max_step, mut raw_jumps) = (0.0, None::<(f32, f64)>, 0.0f32, 0);
         let mut raw_prev = None::<f32>;
         while t0.elapsed() < Duration::from_secs(4) {
             let t = t0.elapsed().as_secs_f64();
@@ -783,17 +783,19 @@ mod tests {
                 raw_prev = Some(raw);
                 let x = a.view(p).pos[0];
                 if t > 1.0 {
-                    if let Some(px) = prev {
-                        max_step = max_step.max((x - px).abs());
+                    if let Some((px, pt)) = prev {
+                        // Movement beyond what 10 m/s explains for the real time between frames (busy CI
+                        // machines oversleep, so frames can be 50+ ms apart instead of 10 ms).
+                        max_step = max_step.max((x - px).abs() - 10.0 * (t - pt) as f32);
                         assert!(x >= px - 0.05, "view never goes backwards ({px} → {x})");
                     }
-                    prev = Some(x);
+                    prev = Some((x, t));
                 }
             }
             std::thread::sleep(Duration::from_millis(10));
         }
-        // 10 m/s × 10 ms = 0.1 m per frame; a lost snapshot without smoothing would jump ≥1 m.
-        assert!(max_step < 0.45, "largest per-frame step {max_step:.2} m (raw snapshots jumped {raw_jumps}×)");
+        // Smooth motion adds ~0 m beyond 10 m/s × frame time; a lost snapshot without smoothing jumps ≥1 m.
+        assert!(max_step < 0.35, "largest jump beyond smooth motion {max_step:.2} m (raw snapshots jumped {raw_jumps}×)");
         let lag = (t0.elapsed().as_secs_f64() * 10.0) as f32 - a.view(a.players.iter().find(|p| p.info.name == "Bob").unwrap()).pos[0];
         assert!((1.0..5.0).contains(&lag), "view lags {lag:.1} m (latency + interpolation delay)");
         assert!(sb.dropped.load(Ordering::Relaxed) > 10, "the lossy link really dropped packets");
