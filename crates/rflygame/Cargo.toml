@@ -1,0 +1,14 @@
+[package]
+name = "rflygame"
+description = "RflyGame: drone flight game on the RflySim-for-macOS physics (free flight, racing, missions, school)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rflysim3d = { path = "../rflysim3d" }
+rfly-core = { path = "../rfly-core" }
+rfly-db = { path = "../rfly-db" }
+macroquad = { version = "0.4", default-features = false, features = ["audio"] }
+gilrs = "0.11"
+socket2 = { version = "0.6", features = ["all"] }

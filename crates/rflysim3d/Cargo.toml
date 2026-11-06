@@ -1,0 +1,12 @@
+[package]
+name = "rflysim3d"
+description = "RflySim3D-compatible 3D viewer for macOS (same UDP protocol as the UE4 RflySim3D)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rfly-proto = { path = "../rfly-proto" }
+macroquad = { version = "0.4", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+socket2 = { version = "0.6", features = ["all"] }

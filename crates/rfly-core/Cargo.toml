@@ -1,0 +1,8 @@
+[package]
+name = "rfly-core"
+description = "Multicopter dynamics and sensor models (no dependencies)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["crates/rfly-core", "crates/rfly-db", "crates/rfly-proto", "crates/coptersim", "crates/rflysim3d", "crates/rflygame"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -1,0 +1,10 @@
+[package]
+name = "rfly-db"
+description = "Reader for RflySim's ModelData.db (vehicle presets and component catalogs)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rfly-core = { path = "../rfly-core" }
+rusqlite = { version = "0.41", features = ["bundled"] }

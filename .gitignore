@@ -1,0 +1,21 @@
+# Build output
+/target
+/build
+/dist
+/logs
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+
+# Generated launchers (scripts/build_apps.sh)
+/RflyTools
+
+# RflySim's own data files: not ours to redistribute. Import them from your RflySim ISO with
+# scripts/import_rflysim_data.sh (they go to your user data folder, not here).
+/assets/ModelData.db
+/assets/flightgear/
+
+# MATLAB build products
+/matlab/RflyMac/bin
+/matlab/RflyMac/models

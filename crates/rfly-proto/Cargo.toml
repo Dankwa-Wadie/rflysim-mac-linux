@@ -1,0 +1,8 @@
+[package]
+name = "rfly-proto"
+description = "RflySim UDP wire formats (CopterSim / RflySim3D / RflySimSDK)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

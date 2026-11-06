@@ -1,0 +1,13 @@
+[package]
+name = "coptersim"
+description = "Headless multicopter simulator for PX4 SITL (RflySim CopterSim replacement for macOS)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rfly-core = { path = "../rfly-core" }
+rfly-db = { path = "../rfly-db" }
+rfly-proto = { path = "../rfly-proto" }
+mavlink = { version = "0.21", default-features = false, features = ["std", "dialect-common", "transport-tcp", "transport-udp", "transport-direct-serial"] }
+clap = { version = "4.6", features = ["derive"] }
