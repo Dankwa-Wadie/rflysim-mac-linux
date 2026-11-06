@@ -527,7 +527,7 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
   in Docker exactly as publish_release.sh does, and a clean Ubuntu 24.04 installed rflytools 0.2.0 from it.
 - `rfly_docker_env` (platform.sh): Docker scripts start colima and bypass the stale Docker Desktop `credsStore`
   without editing ~/.docker/config.json.
-- Tagged v0.2.0 → release workflow builds the draft. Publishing (`scripts/publish_release.sh v0.2.0`) is the user's.
+- Tagged v0.2.0 → release workflow: all 4 jobs green (macOS job really installs/uninstalls the pkg), draft v0.2.0 with 5 packages + SHA256SUMS.txt. Publishing (`scripts/publish_release.sh v0.2.0`) is the user's step.
 - Later: actions/checkout@v4 etc. target Node 20 (deprecated; GitHub runs them on Node 24 for now).
 
 ## Next steps
