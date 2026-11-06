@@ -30,6 +30,9 @@ impl Frame {
     }
 }
 
+/// Names of the 14 `modelInfo` values, in order.
+pub const PARAM_KEYS: [&str; 14] = ["mass", "g", "jxx", "jyy", "jzz", "arm", "ct", "cm", "cr", "wb", "jm", "tm", "cd", "cmd"];
+
 #[derive(Clone, Debug)]
 pub struct Params {
     pub frame: Frame,
@@ -97,10 +100,60 @@ impl Params {
         })
     }
 
+    /// The 14 values in ModelData.db's `modelInfo` order (inverse of [`Params::from_model_info`]).
+    pub fn model_info(&self) -> [f64; 14] {
+        [self.mass, self.g, self.jxx, self.jyy, self.jzz, self.arm, self.ct, self.cm, self.cr, self.wb, self.jm, self.tm, self.cd, self.cmd]
+    }
+
+    /// Text form for `coptersim --params-file` (one `name = value` per line, `#` comments).
+    pub fn to_text(&self, title: &str) -> String {
+        let mut s = format!("# RflyTools vehicle parameters: {title}\n# Same 14 values as RflySim's ModelData.db modelInfo.\n");
+        for (k, v) in PARAM_KEYS.iter().zip(self.model_info()) {
+            s += &format!("{k} = {v:e}\n");
+        }
+        s
+    }
+
+    /// Parses [`Params::to_text`]. Missing keys keep the default F450 value; unknown keys are errors.
+    pub fn from_text(text: &str) -> Result<Params, String> {
+        let mut v = Params::default().model_info();
+        for (n, line) in text.lines().enumerate() {
+            let line = line.split('#').next().unwrap_or("").trim();
+            if line.is_empty() {
+                continue;
+            }
+            let (k, val) = line.split_once('=').ok_or_else(|| format!("line {}: expected name = value", n + 1))?;
+            let i = PARAM_KEYS.iter().position(|x| *x == k.trim()).ok_or_else(|| format!("line {}: unknown parameter {}", n + 1, k.trim()))?;
+            v[i] = val.trim().parse().map_err(|_| format!("line {}: {} is not a number", n + 1, val.trim()))?;
+        }
+        let p = Params::from_model_info(&v).ok_or("bad parameters")?;
+        if p.mass <= 0.0 || p.ct <= 0.0 || p.cr <= 0.0 || p.arm <= 0.0 {
+            return Err("mass, ct, cr and arm must be positive".into());
+        }
+        Ok(p)
+    }
+
     /// Throttle at which total thrust equals weight.
     pub fn hover_throttle(&self) -> f64 {
         let n = self.frame.rotors().len() as f64;
         let w = (self.mass * self.g / (n * self.ct)).sqrt();
         (w - self.wb) / self.cr
+    }
+}
+
+#[cfg(test)]
+mod text_tests {
+    use super::*;
+
+    #[test]
+    fn params_round_trip_through_text() {
+        let mut p = Params::default();
+        p.mass = 2.25;
+        p.cr = 987.5;
+        let q = Params::from_text(&p.to_text("test")).unwrap();
+        assert_eq!(q.model_info(), p.model_info());
+        assert_eq!(Params::from_text("mass = 3\n").unwrap().mass, 3.0);
+        assert!(Params::from_text("weight = 3").is_err());
+        assert!(Params::from_text("mass = -1").is_err());
     }
 }

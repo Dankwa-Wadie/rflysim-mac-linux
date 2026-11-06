@@ -38,9 +38,18 @@ impl ModelDb {
 
     /// Motor catalog (brand, type, KV, weight g).
     pub fn motors(&self) -> Result<Vec<Motor>, Error> {
-        let mut st = self.conn.prepare("SELECT brand, type, KV, weight FROM motor ORDER BY brand, type")?;
+        let mut st = self.conn.prepare("SELECT brand, type, KV, weight, resistance, IO, UO, Immax FROM motor ORDER BY brand, type")?;
         let rows = st.query_map([], |r| {
-            Ok(Motor { brand: txt(r, 0), model: txt(r, 1), kv: num(r, 2), weight_g: num(r, 3) })
+            Ok(Motor {
+                brand: txt(r, 0),
+                model: txt(r, 1),
+                kv: num(r, 2),
+                weight_g: num(r, 3),
+                resistance_mohm: num(r, 4),
+                i0: num(r, 5),
+                u0: num(r, 6),
+                imax: num(r, 7),
+            })
         })?;
         Ok(rows.filter_map(Result::ok).filter(|m| m.kv > 0.0).collect())
     }
@@ -64,7 +73,7 @@ impl ModelDb {
 
     /// Battery catalog (capacity mAh, weight g, cells, nominal volts).
     pub fn batteries(&self) -> Result<Vec<Battery>, Error> {
-        let mut st = self.conn.prepare("SELECT brand, type, capacity, weight, Snum, totalV FROM battery ORDER BY brand, type")?;
+        let mut st = self.conn.prepare("SELECT brand, type, capacity, weight, Snum, totalV, resistance, Ccon FROM battery ORDER BY brand, type")?;
         let rows = st.query_map([], |r| {
             let cells = num(r, 4);
             let v = num(r, 5);
@@ -75,9 +84,29 @@ impl ModelDb {
                 weight_g: num(r, 3),
                 cells,
                 volts: if v > 0.0 { v } else { cells * 3.7 },
+                resistance_mohm: num(r, 6),
+                c_cont: num(r, 7),
             })
         })?;
         Ok(rows.filter_map(Result::ok).filter(|b| b.capacity_mah > 0.0 && b.volts > 0.0).collect())
+    }
+
+    /// ESC catalog (max continuous current A, resistance mOhm, weight g).
+    pub fn escs(&self) -> Result<Vec<Esc>, Error> {
+        let mut st = self.conn.prepare("SELECT brand, type, maxI, resistance, weight FROM esc ORDER BY brand, type")?;
+        let rows = st.query_map([], |r| {
+            Ok(Esc { brand: txt(r, 0), model: txt(r, 1), max_current: num(r, 2), resistance_mohm: num(r, 3), weight_g: num(r, 4) })
+        })?;
+        Ok(rows.filter_map(Result::ok).filter(|e| e.max_current > 0.0).collect())
+    }
+
+    /// RflySim's stored hover estimate for a parameter set (`uavparams.hoverInfo`).
+    pub fn hover_info(&self, name: &str) -> Result<Option<Vec<f64>>, Error> {
+        let mut st = self.conn.prepare("SELECT hoverInfo FROM uavparams WHERE name = ?1 COLLATE NOCASE")?;
+        let mut rows = st.query([name])?;
+        let Some(row) = rows.next()? else { return Ok(None) };
+        let info: String = row.get(0)?;
+        Ok(info.split(',').map(|s| s.trim().parse().ok()).collect())
     }
 
     /// Named airframe presets (`planeItems`): (name, raw component spec).
@@ -90,15 +119,31 @@ impl ModelDb {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Motor {
     pub brand: String,
     pub model: String,
     pub kv: f64,
     pub weight_g: f64,
+    /// Winding resistance (mOhm), no-load current I0 (A) at U0 (V), max current (A); 0 when unknown.
+    pub resistance_mohm: f64,
+    pub i0: f64,
+    pub u0: f64,
+    pub imax: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Esc {
+    pub brand: String,
+    pub model: String,
+    /// Max continuous current (A).
+    pub max_current: f64,
+    /// On-resistance (mOhm), 0 when unknown.
+    pub resistance_mohm: f64,
+    pub weight_g: f64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Propeller {
     pub brand: String,
     pub model: String,
@@ -109,7 +154,7 @@ pub struct Propeller {
     pub cm_correct: f64,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Battery {
     pub brand: String,
     pub model: String,
@@ -117,6 +162,9 @@ pub struct Battery {
     pub weight_g: f64,
     pub cells: f64,
     pub volts: f64,
+    /// Internal resistance (mOhm) and continuous C rating; 0 when unknown.
+    pub resistance_mohm: f64,
+    pub c_cont: f64,
 }
 
 /// One parsed `planeItems` airframe: frame mass (kg), wheelbase (mm) and component names.
@@ -128,10 +176,10 @@ pub struct Airframe {
     pub wheelbase_mm: f64,
     pub motor: (String, String),
     pub prop: (String, String),
+    pub esc: (String, String),
     pub battery: (String, String),
 }
 
-/// Parses `QUAD,0,1.5,450,...;...;MotorBrand,Type,...;PropBrand,Type,...;Esc...;BatBrand,Type,...`.
 /// Per-user folder for data imported from the user's RflySim ISO (`scripts/import_rflysim_data.sh`):
 /// `$RFLY_TOOLS_DATA`, else macOS `~/Library/Application Support/RflyTools`, Linux
 /// `$XDG_DATA_HOME/rflytools` (default `~/.local/share/rflytools`), Windows `%APPDATA%\\RflyTools`.
@@ -159,6 +207,7 @@ pub fn find_model_db(extra: &[PathBuf]) -> Option<PathBuf> {
     c.into_iter().find(|p| p.is_file())
 }
 
+/// Parses `QUAD,0,1.5,450,...;...;MotorBrand,Type,...;PropBrand,Type,...;EscBrand,Type,...;BatBrand,Type,...`.
 pub fn parse_airframe(name: &str, item: &str) -> Option<Airframe> {
     let parts: Vec<Vec<&str>> = item.split(';').map(|p| p.split(',').collect()).collect();
     let f = parts.first()?;
@@ -170,6 +219,7 @@ pub fn parse_airframe(name: &str, item: &str) -> Option<Airframe> {
         wheelbase_mm: f.get(3)?.parse().ok()?,
         motor: pair(2)?,
         prop: pair(3)?,
+        esc: pair(4)?,
         battery: pair(5)?,
     })
 }
@@ -226,6 +276,13 @@ mod tests {
         assert_eq!((a.mass_kg, a.wheelbase_mm), (1.5, 450.0));
         assert_eq!(a.motor, ("DJI".into(), "2312 KV960".into()));
         assert_eq!(a.battery.1, "LiPo 3S-11.1V-25C-5500mAh");
+        assert_eq!(a.esc, ("DJI".into(), "E310".into()));
+        let m = m.iter().find(|x| x.model == "2312 KV960").unwrap();
+        assert!(m.resistance_mohm > 0.0 && m.i0 > 0.0, "{m:?}");
+        let e = d.escs().unwrap();
+        assert!(e.len() > 500 && e.iter().all(|x| x.max_current > 0.0), "{}", e.len());
+        let h = d.hover_info("default").unwrap().unwrap();
+        assert_eq!(h.len(), 8);
     }
 
     #[test]

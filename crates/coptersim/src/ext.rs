@@ -139,6 +139,7 @@ pub fn run(
     params: Params,
     home: Home,
     mut rfly: Option<crate::rfly_out::RflyOut>,
+    mut status: Option<crate::status::StatusOut>,
     init: &dyn Fn(&mut Vehicle),
 ) -> std::io::Result<()> {
     let sock = UdpSocket::bind(("0.0.0.0", port))?;
@@ -161,6 +162,9 @@ pub fn run(
         }
         if let Some(o) = rfly.as_mut() {
             o.publish(data[0], &sim.vehicle);
+        }
+        if let Some(st) = status.as_mut() {
+            st.publish(data[0], &sim.vehicle, true);
         }
         sock.send_to(&encode_reply(req.seq, &data), from)?;
         if data[0] >= next_report {

@@ -57,21 +57,24 @@ impl Build {
         let p = &self.prop;
         let b = &self.battery;
         format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             self.name, self.frame_kg, self.wheelbase, m.brand, m.model, m.kv, m.weight_g, p.brand, p.model, p.diameter_in, p.pitch_in, p.weight_g, p.ct_correct, p.cm_correct,
-            b.brand, b.model, b.capacity_mah, b.weight_g, b.cells, b.volts, ""
+            b.brand, b.model, b.capacity_mah, b.weight_g, b.cells, b.volts, "",
+            // Electrical data (fields 21..26; older files end at 20 and load with zeros).
+            m.resistance_mohm, m.i0, m.u0, m.imax, b.resistance_mohm, b.c_cont
         )
     }
     fn parse(l: &str) -> Option<Build> {
         let f: Vec<&str> = l.split('|').collect();
         let n = |i: usize| f.get(i).and_then(|v| v.parse::<f64>().ok());
+        let opt = |i: usize| n(i).unwrap_or(0.0);
         Some(Build {
             name: f.first()?.to_string(),
             frame_kg: n(1)?,
             wheelbase: n(2)?,
-            motor: Motor { brand: f[3].into(), model: f[4].into(), kv: n(5)?, weight_g: n(6)? },
+            motor: Motor { brand: f[3].into(), model: f[4].into(), kv: n(5)?, weight_g: n(6)?, resistance_mohm: opt(21), i0: opt(22), u0: opt(23), imax: opt(24) },
             prop: Propeller { brand: f[7].into(), model: f[8].into(), diameter_in: n(9)?, pitch_in: n(10)?, weight_g: n(11)?, ct_correct: n(12)?, cm_correct: n(13)? },
-            battery: Battery { brand: f[14].into(), model: f[15].into(), capacity_mah: n(16)?, weight_g: n(17)?, cells: n(18)?, volts: n(19)? },
+            battery: Battery { brand: f[14].into(), model: f[15].into(), capacity_mah: n(16)?, weight_g: n(17)?, cells: n(18)?, volts: n(19)?, resistance_mohm: opt(25), c_cont: opt(26) },
         })
     }
 }
@@ -153,9 +156,9 @@ impl Garage {
                 name: format!("Custom {}", load_builds().len() + 1),
                 frame_kg: 0.8,
                 wheelbase: 450.0,
-                motor: motors.first().cloned().unwrap_or(Motor { brand: String::new(), model: String::new(), kv: 920.0, weight_g: 55.0 }),
+                motor: motors.first().cloned().unwrap_or(Motor { kv: 920.0, weight_g: 55.0, ..Default::default() }),
                 prop: props.first().cloned().unwrap_or(Propeller { brand: String::new(), model: String::new(), diameter_in: 10.0, pitch_in: 4.5, weight_g: 15.0, ct_correct: 1.0, cm_correct: 1.0 }),
-                battery: bats.first().cloned().unwrap_or(Battery { brand: String::new(), model: String::new(), capacity_mah: 5000.0, weight_g: 420.0, cells: 3.0, volts: 11.1 }),
+                battery: bats.first().cloned().unwrap_or(Battery { brand: String::new(), model: String::new(), capacity_mah: 5000.0, weight_g: 420.0, cells: 3.0, volts: 11.1, ..Default::default() }),
             },
             menu: Menu::new("Garage", "", vec![]),
             motors,

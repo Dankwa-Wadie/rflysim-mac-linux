@@ -1,3 +1,4 @@
+pub mod design;
 pub mod flight;
 pub mod game;
 pub mod garage;

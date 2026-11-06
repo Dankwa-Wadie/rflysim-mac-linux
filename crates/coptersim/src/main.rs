@@ -76,11 +76,20 @@ struct Args {
     /// instead of PX4. RflySim's CopterSim used 20100 as its SIL port.
     #[arg(long, value_name = "PORT", num_args = 0..=1, default_missing_value = "20100")]
     ext: Option<u16>,
+    /// Vehicle parameters from a file (written by the CopterSim window's configurator; `name = value`
+    /// lines, the 14 ModelData.db modelInfo values). Takes precedence over --db/--params.
+    #[arg(long, value_name = "FILE")]
+    params_file: Option<String>,
+    /// Send a 10 Hz status line to 127.0.0.1:PORT (the CopterSim window's live panel):
+    /// `RFLYSTAT id t x y z vx vy vz roll pitch yaw u1 u2 u3 u4 armed` (NED m, m/s, deg, throttle 0..1).
+    #[arg(long, value_name = "PORT")]
+    status_port: Option<u16>,
 }
 
 mod ext;
 mod fg_out;
 mod rfly_out;
+mod status;
 
 #[derive(Default)]
 struct Actuators {
@@ -133,12 +142,14 @@ fn main() {
         v.s.att = rfly_core::Quat::from_euler(0.0, 0.0, args.init_yaw.to_radians());
     };
     if let Some(port) = args.ext {
-        if let Err(e) = ext::run(port, params, home, rfly, &init) {
+        let status = args.status_port.and_then(|p| status::StatusOut::new(p, args.id, &params).ok());
+        if let Err(e) = ext::run(port, params, home, rfly, status, &init) {
             eprintln!("coptersim: external mode failed: {e}");
             std::process::exit(1);
         }
         return;
     }
+    let mut status = args.status_port.and_then(|p| status::StatusOut::new(p, args.id, &params).ok());
     let mut sensors = SensorModel::new(home);
     let mut vehicle = Vehicle::new(params);
     init(&mut vehicle);
@@ -258,6 +269,9 @@ fn main() {
         }
 
         vehicle.step(&u, PHYSICS_DT);
+        if let Some(st) = status.as_mut() {
+            st.publish(tick as f64 * PHYSICS_DT, &vehicle, armed);
+        }
         tick += 1;
         let time_usec = tick * 1000;
         if let Some(o) = rfly.as_mut() {
@@ -360,6 +374,18 @@ fn open_link(link: &str) -> std::io::Result<mavlink::Connection<MavMessage>> {
 }
 
 fn load_params(args: &Args) -> Params {
+    if let Some(f) = &args.params_file {
+        match std::fs::read_to_string(f).map_err(|e| e.to_string()).and_then(|t| Params::from_text(&t)) {
+            Ok(p) => {
+                println!("coptersim: loaded vehicle parameters from {f} (mass {:.2} kg, hover throttle {:.0} %)", p.mass, p.hover_throttle() * 100.0);
+                return p;
+            }
+            Err(e) => {
+                eprintln!("coptersim: cannot use {f}: {e}");
+                std::process::exit(2);
+            }
+        }
+    }
     let found = args.db.clone().or_else(|| rfly_db::find_model_db(&[]).map(|p| p.display().to_string()));
     let Some(path) = &found else { return Params::default() };
     match rfly_db::ModelDb::open(path).and_then(|db| db.params(&args.params)) {

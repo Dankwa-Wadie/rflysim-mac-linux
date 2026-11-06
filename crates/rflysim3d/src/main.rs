@@ -30,10 +30,12 @@ struct Args {
     height: i32,
     screenshot: Option<String>,
     after: f64,
+    /// Lighter rendering for integrated graphics / remote desktop (Windows SITLRunLowGPU).
+    low_gpu: bool,
 }
 
 fn args() -> Args {
-    let mut a = Args { window: None, map: "Grasslands".into(), width: 1280, height: 720, screenshot: None, after: 3.0 };
+    let mut a = Args { window: None, map: "Grasslands".into(), width: 1280, height: 720, screenshot: None, after: 3.0, low_gpu: false };
     let v: Vec<String> = std::env::args().collect();
     let mut i = 1;
     while i < v.len() {
@@ -45,9 +47,14 @@ fn args() -> Args {
             "--height" => a.height = next.parse().unwrap_or(720),
             "--screenshot" => a.screenshot = Some(next),
             "--after" => a.after = next.parse().unwrap_or(3.0),
+            "--low-gpu" => {
+                a.low_gpu = true;
+                i += 1;
+                continue;
+            }
             "--help" | "-h" => {
                 println!(
-                    "rflysim3d [--window N] [--map NAME] [--width W] [--height H] [--screenshot out.png --after SECS]\n\
+                    "rflysim3d [--window N] [--map NAME] [--width W] [--height H] [--low-gpu] [--screenshot out.png --after SECS]\n\
                      Maps: {}",
                     MAP_NAMES.join(", ")
                 );
@@ -60,6 +67,15 @@ fn args() -> Args {
         }
         i += 2;
     }
+    // Windows scripts select the low-GPU mode with UE4_MAP=LowGPU.
+    if a.map.eq_ignore_ascii_case("LowGPU") {
+        a.map = "Grasslands".into();
+        a.low_gpu = true;
+    }
+    if a.low_gpu {
+        a.width = a.width.min(960);
+        a.height = a.height.min(540);
+    }
     a
 }
 
@@ -70,7 +86,7 @@ fn window_conf() -> macroquad::conf::Conf {
         window_width: a.width,
         window_height: a.height,
         high_dpi: false,
-        sample_count: 4,
+        sample_count: if a.low_gpu { 1 } else { 4 },
         window_resizable: true,
         ..Default::default()
     };
@@ -859,7 +875,7 @@ async fn main() {
         cam: Cam { view: View::Chase, focus: 0, az: 0.0, el: 0.35, dist: 3.5, free_pos: vec3(-10.0, 0.0, -5.0), free_yaw: 0.0, free_pitch: -0.2, fov_h_deg: 90.0, smooth_pos: None },
         sensors: Vec::new(),
         messages: Vec::new(),
-        show_trails: true,
+        show_trails: !a.low_gpu,
         show_labels: true,
         show_help: true,
         show_hud: true,
