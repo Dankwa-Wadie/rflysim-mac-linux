@@ -148,6 +148,9 @@ pub struct VehicleModel {
     pub rotors: Vec<(Vec3, f32)>,
     /// Half extents of the bounding box (FRD).
     pub half: Vec3,
+    /// How far the lowest point (e.g. landing legs) is below the model origin (m, before scaling).
+    /// CopterSim reports z ≈ 0 for a landed vehicle, so RflySim3D-style viewers lift the model by this.
+    pub ground: f32,
 }
 
 pub fn build_model(kind: ModelKind, tint: Color) -> VehicleModel {
@@ -201,7 +204,8 @@ pub fn build_model(kind: ModelKind, tint: Color) -> VehicleModel {
     p.cuboid(vec3(0., 0., 0.), vec3(blade, 0.012, 0.003), Color::new(0.1, 0.1, 0.1, 1.));
     let mut d = MeshBuf::default();
     d.cylinder(vec3(0., 0., 0.), blade, blade, 0.002, 20, Color::new(0.2, 0.2, 0.2, 0.35));
-    VehicleModel { body: b.to_mesh(None), prop: p.to_mesh(None), disk: d.to_mesh(None), rotors, half }
+    let ground = b.v.iter().map(|v| v.position.z).fold(0.0f32, f32::max);
+    VehicleModel { body: b.to_mesh(None), prop: p.to_mesh(None), disk: d.to_mesh(None), rotors, half, ground }
 }
 
 // ---------------------------------------------------------------- maps

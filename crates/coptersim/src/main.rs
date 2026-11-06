@@ -84,12 +84,40 @@ struct Args {
     /// `RFLYSTAT id t x y z vx vy vz roll pitch yaw u1 u2 u3 u4 armed` (NED m, m/s, deg, throttle 0..1).
     #[arg(long, value_name = "PORT")]
     status_port: Option<u16>,
+    /// RflySim communication mode with Python (UDPSIMMODE): 0 UDP_Full, 1 UDP_Simple, 2 Mavlink_Full (default),
+    /// 3 Mavlink_Simple, 4 Mavlink_NoSend, 5 Mavlink_NoGPS, 6 Mavlink_Vision. Number or name.
+    #[arg(long, value_name = "MODE", default_value = "2", value_parser = parse_udp_mode)]
+    udp_mode: u8,
+    /// SITL in UDP_Full/UDP_Simple: PX4's MAVLink (onboard) link for telemetry and commands, e.g.
+    /// `udpin:0.0.0.0:25100` (SITLRun sets it). HIL uses the serial link instead.
+    #[arg(long, value_name = "ADDR")]
+    px4_mav: Option<String>,
+}
+
+const UDP_MODE_NAMES: [&str; 7] = ["UDP_Full", "UDP_Simple", "Mavlink_Full", "Mavlink_Simple", "Mavlink_NoSend", "Mavlink_NoGPS", "Mavlink_Vision"];
+
+fn parse_udp_mode(s: &str) -> Result<u8, String> {
+    if let Ok(n) = s.parse::<u8>() {
+        return if (n as usize) < UDP_MODE_NAMES.len() { Ok(n) } else { Err(format!("UDP mode {n} is not 0..6")) };
+    }
+    UDP_MODE_NAMES.iter().position(|n| n.eq_ignore_ascii_case(s)).map(|i| i as u8).ok_or_else(|| format!("unknown UDP mode {s} ({})", UDP_MODE_NAMES.join(", ")))
+}
+
+/// Messages forwarded to Python in Mavlink_Simple mode (enough for RflySimSDK's PX4MavCtrler).
+fn simple_mode_msg(m: &MavMessage) -> bool {
+    matches!(
+        m,
+        MavMessage::HEARTBEAT(_) | MavMessage::ATTITUDE(_) | MavMessage::LOCAL_POSITION_NED(_) | MavMessage::GLOBAL_POSITION_INT(_)
+            | MavMessage::HOME_POSITION(_) | MavMessage::SYS_STATUS(_) | MavMessage::COMMAND_ACK(_) | MavMessage::STATUSTEXT(_)
+            | MavMessage::GPS_RAW_INT(_) | MavMessage::EXTENDED_SYS_STATE(_) | MavMessage::PARAM_VALUE(_)
+    )
 }
 
 mod ext;
 mod fg_out;
 mod rfly_out;
 mod status;
+mod udp_bridge;
 
 #[derive(Default)]
 struct Actuators {
@@ -175,13 +203,19 @@ fn main() {
     println!("coptersim: link open ({link})");
 
     // MAVLink relays (HIL: the Pixhawk's USB port is ours, so QGC/Python go through us).
+    let udp_mode = args.udp_mode;
+    println!("coptersim: communication mode {} ({})", udp_mode, UDP_MODE_NAMES[udp_mode as usize]);
     let mut relays: Vec<(String, bool)> = args.forward.iter().map(|f| (f.clone(), true)).collect();
     if relays.is_empty() && !args.no_forward && link.starts_with("serial:") {
         relays.push(("udpout:127.0.0.1:14550".into(), true));
-        relays.push((format!("udpout:127.0.0.1:{}", rfly_proto::mav_port(args.id) + 1), false));
-        relays.push((format!("udpin:0.0.0.0:{}", rfly_proto::mav_port(args.id)), true));
+        // Python's MAVLink ports, except in UDP modes (served by the UDP bridge) and Mavlink_NoSend.
+        if udp_mode >= 2 && udp_mode != 4 {
+            relays.push((format!("udpout:127.0.0.1:{}", rfly_proto::mav_port(args.id) + 1), false));
+            relays.push((format!("udpin:0.0.0.0:{}", rfly_proto::mav_port(args.id)), true));
+        }
     }
-    let mut outs: Vec<Conn> = Vec::new();
+    let python_port = format!(":{}", rfly_proto::mav_port(args.id) + 1);
+    let mut outs: Vec<(Conn, bool)> = Vec::new();
     for (addr, back) in relays.iter().filter(|_| !args.no_forward) {
         match mavlink::connect::<MavMessage>(addr) {
             Ok(mut c) => {
@@ -197,22 +231,69 @@ fn main() {
                     });
                 }
                 if !addr.starts_with("udpin:") {
-                    outs.push(c);
+                    outs.push((c, addr.ends_with(&python_port)));
                 }
             }
             Err(e) => eprintln!("coptersim: cannot relay to {addr}: {e}"),
         }
     }
 
+    // UDP_Full / UDP_Simple: serve Python's RflySim structs, from PX4 telemetry (serial link in HIL, a separate
+    // MAVLink link in SITL).
+    let tele = Arc::new(Mutex::new(udp_bridge::Telemetry::default()));
+    if udp_mode <= 1 {
+        let crash = Arc::new(Mutex::new(-1i32));
+        let sender: udp_bridge::Sender = if link.starts_with("serial:") {
+            let c = conn.clone();
+            Arc::new(move |m: &MavMessage| {
+                let _ = c.send(&MavHeader { system_id: 255, component_id: 190, sequence: 0 }, m);
+            })
+        } else {
+            let Some(addr) = &args.px4_mav else {
+                eprintln!("coptersim: UDP_Full/UDP_Simple in SITL needs --px4-mav (PX4's onboard MAVLink link; SITLRun sets it)");
+                std::process::exit(2);
+            };
+            let mut pc = match mavlink::connect::<MavMessage>(addr) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("coptersim: cannot open PX4 MAVLink link {addr}: {e}");
+                    std::process::exit(2);
+                }
+            };
+            pc.set_protocol_version(MavlinkVersion::V2);
+            let pc = Arc::new(pc);
+            let (rx, t) = (pc.clone(), tele.clone());
+            std::thread::spawn(move || loop {
+                if let Ok((_, m)) = rx.recv() {
+                    t.lock().unwrap().update(&m);
+                }
+            });
+            Arc::new(move |m: &MavMessage| {
+                let _ = pc.send(&MavHeader { system_id: 255, component_id: 190, sequence: 0 }, m);
+            })
+        };
+        if let Err(e) = udp_bridge::spawn(udp_mode, args.id, sender, tele.clone(), crash) {
+            eprintln!("coptersim: cannot open the Python port {}: {e}", rfly_proto::mav_port(args.id));
+            std::process::exit(2);
+        }
+    }
+
     // Receiver thread: collect actuator commands, report PX4 status text, feed relays.
     let act = Arc::new(Mutex::new(Actuators::default()));
     {
-        let (conn, act) = (conn.clone(), act.clone());
+        let (conn, act, tele) = (conn.clone(), act.clone(), tele.clone());
         std::thread::spawn(move || loop {
             let r = conn.recv();
             if let Ok((h, m)) = &r {
-                for o in &outs {
+                for (o, python) in &outs {
+                    // Mavlink_Simple: Python gets a reduced message set.
+                    if *python && udp_mode == 3 && !simple_mode_msg(m) {
+                        continue;
+                    }
                     let _ = o.send(h, m);
+                }
+                if udp_mode <= 1 {
+                    tele.lock().unwrap().update(m);
                 }
             }
             match r {
@@ -299,7 +380,32 @@ fn main() {
                 ..Default::default()
             }));
         }
-        if tick % GPS_EVERY == 0 {
+        // Mavlink_Vision: true pose as external vision (PX4 fuses it instead of GPS).
+        if udp_mode == 6 && tick % 33 == 0 {
+            let s = &vehicle.s;
+            let mut cov = [0f32; 21];
+            cov[0] = f32::NAN;
+            send(&MavMessage::ODOMETRY(mavlink::dialects::common::ODOMETRY_DATA {
+                time_usec,
+                frame_id: mavlink::dialects::common::MavFrame::MAV_FRAME_LOCAL_NED,
+                child_frame_id: mavlink::dialects::common::MavFrame::MAV_FRAME_BODY_FRD,
+                x: s.pos.x as f32,
+                y: s.pos.y as f32,
+                z: s.pos.z as f32,
+                q: [s.att.w as f32, s.att.x as f32, s.att.y as f32, s.att.z as f32],
+                vx: f32::NAN,
+                vy: f32::NAN,
+                vz: f32::NAN,
+                rollspeed: f32::NAN,
+                pitchspeed: f32::NAN,
+                yawspeed: f32::NAN,
+                pose_covariance: cov,
+                velocity_covariance: cov,
+                ..Default::default()
+            }));
+        }
+        // Mavlink_NoGPS and Mavlink_Vision: no GPS.
+        if tick % GPS_EVERY == 0 && udp_mode != 5 && udp_mode != 6 {
             let g = sensors.gps(&vehicle);
             let v = g.vel_ned;
             let ground_speed = (v.x * v.x + v.y * v.y).sqrt();

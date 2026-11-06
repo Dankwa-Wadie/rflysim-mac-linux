@@ -32,14 +32,32 @@ struct Args {
     after: f64,
     /// Lighter rendering for integrated graphics / remote desktop (Windows SITLRunLowGPU).
     low_gpu: bool,
+    /// Windows RflySim3D start options: `-key=S,N1` (hotkeys) and `-cmd=RflyChangeMapbyID-15` (commands).
+    keys: Vec<(String, i32)>,
+    cmds: Vec<String>,
 }
 
 fn args() -> Args {
-    let mut a = Args { window: None, map: "Grasslands".into(), width: 1280, height: 720, screenshot: None, after: 3.0, low_gpu: false };
+    let mut a = Args { window: None, map: "Grasslands".into(), width: 1280, height: 720, screenshot: None, after: 3.0, low_gpu: false, keys: vec![], cmds: vec![] };
     let v: Vec<String> = std::env::args().collect();
     let mut i = 1;
     while i < v.len() {
         let next = v.get(i + 1).cloned().unwrap_or_default();
+        // -key=... / -cmd=... (RflySim3D.exe style, one dash, '-' standing for spaces in commands)
+        let raw = v[i].trim_start_matches('-');
+        if let Some(k) = raw.strip_prefix("key=") {
+            for item in k.split(',').filter(|x| !x.is_empty()) {
+                let (letter, num) = item.split_at(item.chars().next().map(char::len_utf8).unwrap_or(0));
+                a.keys.push((letter.to_ascii_uppercase(), num.parse().unwrap_or(-1)));
+            }
+            i += 1;
+            continue;
+        }
+        if let Some(c) = raw.strip_prefix("cmd=") {
+            a.cmds.extend(c.split(';').filter(|x| !x.is_empty()).map(|x| x.replace('-', " ")));
+            i += 1;
+            continue;
+        }
         match v[i].as_str() {
             "--window" | "-w" => a.window = next.parse().ok(),
             "--map" | "-m" => a.map = next,
@@ -54,7 +72,7 @@ fn args() -> Args {
             }
             "--help" | "-h" => {
                 println!(
-                    "rflysim3d [--window N] [--map NAME] [--width W] [--height H] [--low-gpu] [--screenshot out.png --after SECS]\n\
+                    "rflysim3d [--window N] [--map NAME] [--width W] [--height H] [--low-gpu] [-key=S,N1] [-cmd=RflyChangeMapbyID-1]\n          [--screenshot out.png --after SECS]\n\
                      Maps: {}",
                     MAP_NAMES.join(", ")
                 );
@@ -736,7 +754,8 @@ impl App {
             .map(|v| DrawVehicle {
                 model: &v.model,
                 kind: model_for_type(v.vtype),
-                pos: v.pos,
+                // Stand the model on its landing gear: CopterSim's z ≈ 0 when landed is the body origin.
+                pos: v.pos - vec3(0.0, 0.0, v.model.ground * v.scale.z),
                 q: v.q(),
                 scale: v.scale,
                 prop_angle: v.prop_angle,
@@ -893,6 +912,14 @@ async fn main() {
         update: None,
     };
     let update_rx = (a.screenshot.is_none() || std::env::var_os("RFLY_UPDATE_URL").is_some()).then(rfly_update::spawn_check);
+    // Start-up hotkeys and commands, as RflySim3D.exe's -key= / -cmd= options.
+    let local: SocketAddr = ([127, 0, 0, 1], 0).into();
+    for c in &a.cmds {
+        app.command(c, local);
+    }
+    for (k, n) in &a.keys {
+        app.key_cmd(k, *n);
+    }
     // A ground-fixed demo camera pose until a vehicle shows up.
     app.cam.free_pos = vec3(-12.0, -6.0, -6.0);
     loop {

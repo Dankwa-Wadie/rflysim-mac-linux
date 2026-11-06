@@ -23,7 +23,7 @@ use widgets::*;
 const STATUS_BASE: u16 = 30400;
 const OS: &str = if cfg!(target_os = "macos") { "macOS" } else { "Linux" };
 const SIM_MODES: [&str; 3] = ["PX4_SITL  (PX4 on this computer)", "PX4_HITL  (Pixhawk over USB)", "Simulink / Python  (external controller, UDP 20100)"];
-const UDP_MODES: [&str; 1] = ["UDP_Full"];
+const UDP_MODES: [&str; 7] = ["UDP_Full", "UDP_Simple", "Mavlink_Full", "Mavlink_Simple", "Mavlink_NoSend", "Mavlink_NoGPS", "Mavlink_Vision"];
 
 fn window_conf() -> Conf {
     Conf { window_title: format!("CopterSim ({OS})"), window_width: 1280, window_height: 820, high_dpi: false, sample_count: 4, ..Default::default() }
@@ -279,7 +279,7 @@ impl App {
             vid: "1".into(),
             count: "1".into(),
             mode: 0,
-            udp: 0,
+            udp: 2,
             map: 0,
             ports: vec![],
             port: 0,
@@ -458,6 +458,7 @@ impl App {
         if self.low_gpu {
             common.push("--low-gpu".into());
         }
+        common.extend(["--udp-mode".into(), self.udp.to_string()]);
         if self.no_3d {
             common.push("--no-3d".into());
         }

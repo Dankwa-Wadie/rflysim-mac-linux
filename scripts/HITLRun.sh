@@ -13,14 +13,14 @@
 #   --start-index I       first CopterID (START_INDEX); vehicles follow the port order
 #   --sysid               CopterID = each Pixhawk's MAV_SYS_ID (HITLRunSysID)
 #   --origin X Y, --yaw DEG, --interval M, --pos-x/--pos-y/--yaw-list LISTS   start positions (as SITLRun)
-#   --map NAME, --no-3d, --low-gpu, --qgc, --params-file FILE, --status-port P   (as SITLRun)
+#   --map NAME, --no-3d, --low-gpu, --qgc, --params-file FILE, --status-port P, --udp-mode M   (as SITLRun)
 #   Linux: your user must be in the serial group (sudo usermod -aG dialout $USER, then log in again)
 #   and ModemManager must not grab the port (sudo systemctl stop ModemManager).
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/platform.sh"
 MAP="Grasslands"; BAUD=921600; PORTS=(); AUTO=0; START=1; SYSID=0; NO3D=0; LOWGPU=0; QGC=0
-SPACING=2; OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""
+SPACING=2; OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""; UDPMODE=2
 while [ $# -gt 0 ]; do
   case "$1" in
     --map) MAP="$2"; shift ;;
@@ -39,6 +39,7 @@ while [ $# -gt 0 ]; do
     --yaw-list) PYAW="$2"; shift ;;
     --params-file) PARAMS="$2"; shift ;;
     --status-port) STATUS="$2"; shift ;;
+    --udp-mode) UDPMODE="$2"; shift ;;
     -h|--help) sed -n 2,21p "$0"; exit 0 ;;
     -*) echo "HITLRun: unknown option $1 (see --help)"; exit 1 ;;
     *) PORTS+=("$1") ;;
@@ -111,7 +112,7 @@ for p in "${PORTS[@]}"; do
   [ -n "$PX" ] && [ -n "$(nth "$PX" $((k + 1)))" ] && X="$(nth "$PX" $((k + 1)))"
   [ -n "$PY" ] && [ -n "$(nth "$PY" $((k + 1)))" ] && Y="$(nth "$PY" $((k + 1)))"
   [ -n "$PYAW" ] && [ -n "$(nth "$PYAW" $((k + 1)))" ] && VYAW="$(nth "$PYAW" $((k + 1)))"
-  EXTRA=(); [ -n "$PARAMS" ] && EXTRA+=(--params-file "$PARAMS"); [ -n "$STATUS" ] && EXTRA+=(--status-port $((STATUS + k)))
+  EXTRA=(--udp-mode "$UDPMODE"); [ -n "$PARAMS" ] && EXTRA+=(--params-file "$PARAMS"); [ -n "$STATUS" ] && EXTRA+=(--status-port $((STATUS + k)))
   "$SIM" --id "$i" --link "serial:$p:$BAUD" ${DBARG[@]+"${DBARG[@]}"} --init-x="$X" --init-y="$Y" --init-yaw="$VYAW" \
       ${EXTRA[@]+"${EXTRA[@]}"} >"$LOG/coptersim_$i.log" 2>&1 &
   PIDS+=("$!")
@@ -130,5 +131,5 @@ if [ -t 0 ]; then
 elif [ "$NO3D" = 0 ]; then
   wait "$VIEW_PID"
 else
-  while true; do sleep 3600; done
+  while true; do sleep 3600 & wait $!; done  # wait (not sleep) lets the stop signal through at once
 fi

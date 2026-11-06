@@ -16,6 +16,8 @@
 #   (SITLRunLowGPU)       --low-gpu                lighter viewer (smaller window, no shadows/trails)
 #                         --qgc                    also start QGroundControl
 #                         --fg                     also show vehicle #1 in FlightGear (F450 model)
+#   UDPSIMMODE=2          --udp-mode M             Python link: 0 UDP_Full, 1 UDP_Simple, 2 Mavlink_Full (default),
+#                                                  3 Mavlink_Simple, 4 Mavlink_NoSend, 5 Mavlink_NoGPS, 6 Mavlink_Vision
 #                         --params-file FILE       vehicle parameters (from the CopterSim window)
 #                         --status-port P          10 Hz status of each vehicle to UDP P+i-1 (CopterSim window)
 #                         --px4 DIR                PX4-Autopilot checkout (default ~/tools/PX4-Autopilot)
@@ -28,7 +30,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/platform.sh"
 N=""; MAP="Grasslands"; NO3D=0; LOWGPU=0; QGC=0; FG=0; SPACING=2; START=1; MAX=50
-OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""
+OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""; UDPMODE=2
 PX4_DIR="${PX4_DIR:-$HOME/tools/PX4-Autopilot}"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -47,8 +49,9 @@ while [ $# -gt 0 ]; do
     --yaw-list) PYAW="$2"; shift ;;
     --params-file) PARAMS="$2"; shift ;;
     --status-port) STATUS="$2"; shift ;;
+    --udp-mode) UDPMODE="$2"; shift ;;
     --px4) PX4_DIR="$2"; shift ;;
-    -h|--help) sed -n 2,27p "$0"; exit 0 ;;
+    -h|--help) sed -n 2,29p "$0"; exit 0 ;;
     -*) echo "SITLRun: unknown option $1 (see --help)"; exit 1 ;;
     *) N="$1" ;;
   esac
@@ -64,6 +67,11 @@ done
 if [ "$N" -gt "$MAX" ]; then echo "The vehicle number is too large, which may cause a crash (max $MAX; --max to change)"; exit 1; fi
 is_uint "$START" && [ "$START" -ge 1 ] || { echo "SITLRun: --start-index must be a positive integer"; exit 1; }
 [ -z "$PARAMS" ] || [ -f "$PARAMS" ] || { echo "SITLRun: parameter file not found: $PARAMS"; exit 1; }
+case "$UDPMODE" in
+  0|[Uu][Dd][Pp]_[Ff]ull) UDPMODE=0 ;; 1|[Uu][Dd][Pp]_[Ss]imple) UDPMODE=1 ;; 2|[Mm]avlink_[Ff]ull) UDPMODE=2 ;;
+  3|[Mm]avlink_[Ss]imple) UDPMODE=3 ;; 4|[Mm]avlink_[Nn]o[Ss]end) UDPMODE=4 ;; 5|[Mm]avlink_[Nn]o[Gg][Pp][Ss]) UDPMODE=5 ;;
+  6|[Mm]avlink_[Vv]ision) UDPMODE=6 ;; *) echo "SITLRun: unknown --udp-mode $UDPMODE"; exit 1 ;;
+esac
 
 PX4_BUILD="$PX4_DIR/build/px4_sitl_default"
 SIM="$(rfly_bin coptersim)"; VIEW="$(rfly_bin rflysim3d)"
@@ -113,6 +121,9 @@ for k in $(seq 0 $((N - 1))); do
   EXTRA=(); [ "$FG" = 1 ] && [ "$k" = 0 ] && EXTRA+=(--fg)
   [ -n "$PARAMS" ] && EXTRA+=(--params-file "$PARAMS")
   [ -n "$STATUS" ] && EXTRA+=(--status-port $((STATUS + k)))
+  EXTRA+=(--udp-mode "$UDPMODE")
+  # UDP_Full/UDP_Simple: coptersim serves Python's ports and talks to PX4 over its own MAVLink link.
+  [ "$UDPMODE" -le 1 ] && EXTRA+=(--px4-mav "udpin:0.0.0.0:$((25100 + 2 * inst))")
   "$SIM" --id "$i" ${DBARG[@]+"${DBARG[@]}"} --init-x="$X" --init-y="$Y" --init-yaw="$VYAW" ${EXTRA[@]+"${EXTRA[@]}"} ${SIM_ARGS:-} >"$LOG/coptersim_$i.log" 2>&1 &
   PIDS+=("$!")
   mkdir -p "$PX4_BUILD/instance_$inst"
@@ -127,9 +138,21 @@ for k in $(seq 0 $((N - 1))); do
   until grep -q "Startup script returned successfully" "$LOG/px4_$i.log" 2>/dev/null; do
     t=$((t + 1)); [ $t -gt 60 ] && { echo "PX4 #$i did not start, see $LOG/px4_$i.log"; exit 1; }; sleep 1
   done
-  (cd "$PX4_BUILD" && ./bin/px4-mavlink --instance "$inst" start -x -u $((20100 + 2 * inst)) -o $((20101 + 2 * inst)) \
-      -t 127.0.0.1 -r 4000000 -m onboard) >>"$LOG/px4_$i.log" 2>&1
-  echo "SITLRun: vehicle #$i ready (PX4 instance $inst, Python port $((20100 + 2 * inst))/$((20101 + 2 * inst)))"
+  # Python's MAVLink link, per UDPSIMMODE (PX4 listens on -u, sends to -o).
+  case "$UDPMODE" in
+    0|1) MAV=(-u $((25101 + 2 * inst)) -o $((25100 + 2 * inst)) -r 4000000 -m onboard) ;;  # to coptersim's bridge
+    3) MAV=(-u $((20100 + 2 * inst)) -o $((20101 + 2 * inst)) -r 200000 -m onboard) ;;     # Mavlink_Simple: lower rate
+    4) MAV=() ;;                                                                           # Mavlink_NoSend
+    *) MAV=(-u $((20100 + 2 * inst)) -o $((20101 + 2 * inst)) -r 4000000 -m onboard) ;;
+  esac
+  [ ${#MAV[@]} -gt 0 ] && (cd "$PX4_BUILD" && ./bin/px4-mavlink --instance "$inst" start -x -t 127.0.0.1 "${MAV[@]}") >>"$LOG/px4_$i.log" 2>&1
+  # Mavlink_NoGPS / Mavlink_Vision: no GPS; Vision fuses coptersim's external-vision odometry instead.
+  setp() { (cd "$PX4_BUILD" && ./bin/px4-param --instance "$inst" set "$1" "$2") >>"$LOG/px4_$i.log" 2>&1; }
+  # PX4 keeps parameters per instance, so every mode sets (or resets) all of these.
+  (cd "$PX4_BUILD" && ./bin/px4-param --instance "$inst" reset COM_ARM_WO_GPS EKF2_GPS_CTRL EKF2_EV_CTRL EKF2_HGT_REF) >>"$LOG/px4_$i.log" 2>&1
+  if [ "$UDPMODE" = 5 ] || [ "$UDPMODE" = 6 ]; then setp COM_ARM_WO_GPS 1; setp EKF2_GPS_CTRL 0; fi
+  if [ "$UDPMODE" = 6 ]; then setp EKF2_EV_CTRL 15; setp EKF2_HGT_REF 3; fi
+  echo "SITLRun: vehicle #$i ready (PX4 instance $inst, Python port $((20100 + 2 * inst))/$((20101 + 2 * inst)), mode $UDPMODE)"
 done
 
 [ "$QGC" = 1 ] && launch_qgc
@@ -148,5 +171,5 @@ if [ -t 0 ]; then
 elif [ "$NO3D" = 0 ]; then
   wait "$VIEW_PID"
 else
-  while true; do sleep 3600; done
+  while true; do sleep 3600 & wait $!; done  # wait (not sleep) lets the stop signal through at once
 fi
