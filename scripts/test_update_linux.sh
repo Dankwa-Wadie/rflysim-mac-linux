@@ -11,6 +11,7 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEYS="${RFLY_RELEASE_KEYS:-$HOME/.config/rflytools-release}"
 [ -f "$KEYS/release.key" ] && [ -f "$KEYS/apt-signing.asc" ] || { echo "release keys not found in $KEYS"; exit 1; }
+. "$ROOT/scripts/platform.sh"; rfly_docker_env
 docker build -q -t rflysim-linux-test "$ROOT/docker/linux-test" >/dev/null
 OUT="$ROOT/logs/update_test"; mkdir -p "$OUT"
 docker run --rm -v "$ROOT:/src:ro" -v "$KEYS:/keys:ro" -v "$OUT:/out" \

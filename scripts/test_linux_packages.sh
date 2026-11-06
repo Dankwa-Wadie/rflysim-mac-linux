@@ -15,6 +15,7 @@ done
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(ubuntu:24.04:amd64 debian:12:arm64)
 VER="$(grep -m1 '^version' "$ROOT/Cargo.toml" | cut -d'"' -f2)"
 ISOMOUNT=(); [ -n "$ISO" ] && ISOMOUNT=(-v "$ISO:/iso/RFLY.iso:ro")
+. "$ROOT/scripts/platform.sh"; [ "$RFLY_OS" = macos ] && rfly_docker_env
 FAIL=0
 
 for t in "${TARGETS[@]}"; do

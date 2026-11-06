@@ -12,6 +12,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGES="ABCDEFG"; SHELL_ONLY=0
 PX4_SRC="${PX4_DIR:-$HOME/tools/PX4-Autopilot}"
 for a in "$@"; do case "$a" in --shell) SHELL_ONLY=1 ;; *) STAGES="$a" ;; esac; done
+. "$ROOT/scripts/platform.sh"; rfly_docker_env
 IMG=rflysim-linux-test
 docker build -q -t "$IMG" "$ROOT/docker/linux-test" >/dev/null
 OUT="$ROOT/logs/linux_test"; mkdir -p "$OUT"

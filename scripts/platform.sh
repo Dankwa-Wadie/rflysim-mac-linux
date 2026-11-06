@@ -117,3 +117,21 @@ rfly_update_notice() {
   [ -x "$u" ] && "$u" --notice
   return 0
 }
+
+# Makes `docker` usable for the container-based scripts without changing the user's Docker config:
+# starts colima if it is installed and stopped, talks to its socket, and works around a leftover
+# Docker Desktop credential helper ("credsStore": "desktop") by using an empty, private client config.
+rfly_docker_env() {
+  if ! docker info >/dev/null 2>&1 && command -v colima >/dev/null 2>&1; then
+    colima status >/dev/null 2>&1 || colima start --vm-type vz --vz-rosetta >/dev/null 2>&1 || true
+    [ -S "$HOME/.colima/default/docker.sock" ] && export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
+  fi
+  if grep -qs '"credsStore": *"desktop"' "${DOCKER_CONFIG:-$HOME/.docker}/config.json" && ! command -v docker-credential-desktop >/dev/null 2>&1; then
+    # Keep the endpoint of the current context (it lives in the config we are about to bypass).
+    if [ -z "${DOCKER_HOST:-}" ]; then
+      DOCKER_HOST="$(docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null)"; export DOCKER_HOST
+    fi
+    export DOCKER_CONFIG="${TMPDIR:-/tmp}/rflytools-docker-config"; mkdir -p "$DOCKER_CONFIG"
+  fi
+  docker info >/dev/null 2>&1 || { echo "Docker is not available (install colima: brew install colima)"; return 1; }
+}

@@ -72,6 +72,7 @@ if [ "$APT" = 1 ]; then
     scripts/build_apt_repo.sh "$W/debs" "$W/site" "$KEYS/apt-signing.asc"
   else
     # macOS: build it in a Debian container (colima/Docker). Paths must be under $HOME for colima's file sharing.
+    . "$ROOT/scripts/platform.sh"; rfly_docker_env
     D="$HOME/.cache/rflytools-publish"; rm -rf "$D"; mkdir -p "$D"; cp -R "$W/debs" "$W/site" "$D/"; cp "$KEYS/apt-signing.asc" "$D/"
     docker run --rm -v "$ROOT:/src:ro" -v "$D:/w" debian:bookworm-slim bash -c '
       apt-get update -qq >/dev/null && apt-get install -y -qq apt-utils gnupg >/dev/null 2>&1

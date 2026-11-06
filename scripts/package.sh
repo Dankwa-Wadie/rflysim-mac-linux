@@ -26,6 +26,7 @@ WRAPPERS="rfly-sitlrun:SITLRun.sh rfly-hitlrun:HITLRun.sh rfly-python:Python38En
 # ---------- on a Mac: build the Linux packages in containers ----------
 if [ "${1:-}" = --linux ]; then
   shift; ARCHES="${*:-amd64 arm64}"
+  rfly_docker_env
   for a in $ARCHES; do
     echo "== Linux $a"
     # The classic builder ignores --platform, so build FROM the base image's digest for this architecture.
