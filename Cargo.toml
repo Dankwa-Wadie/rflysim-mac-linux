@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/rfly-core", "crates/rfly-db", "crates/rfly-proto", "crates/coptersim", "crates/rflysim3d", "crates/rflygame", "crates/rfly-update", "crates/coptersim-ui"]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 

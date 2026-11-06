@@ -14,6 +14,7 @@ while [ $# -gt 0 ]; do
 done
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(ubuntu:24.04:amd64 debian:12:arm64)
 VER="$(grep -m1 '^version' "$ROOT/Cargo.toml" | cut -d'"' -f2)"
+NAPPS="$(grep -c '^app "' "$ROOT/scripts/build_apps.sh")"   # launchers the packages must install
 ISOMOUNT=(); [ -n "$ISO" ] && ISOMOUNT=(-v "$ISO:/iso/RFLY.iso:ro")
 . "$ROOT/scripts/platform.sh"; [ "$RFLY_OS" = macos ] && rfly_docker_env
 FAIL=0
@@ -22,7 +23,7 @@ for t in "${TARGETS[@]}"; do
   arch="${t##*:}"; img="${t%:*}"; uarch=$([ "$arch" = amd64 ] && echo x86_64 || echo aarch64)
   echo "===== $img ($arch)"
   docker run --rm --platform "linux/$arch" -v "$ROOT/dist:/dist:ro" ${ISOMOUNT[@]+"${ISOMOUNT[@]}"} \
-    -e VER="$VER" -e ARCH="$arch" -e UARCH="$uarch" "$img" bash -c '
+    -e VER="$VER" -e NAPPS="$NAPPS" -e ARCH="$arch" -e UARCH="$uarch" "$img" bash -c '
 set -u; ok=1; chk() { if eval "$2"; then echo "PASS $1"; else echo "FAIL $1"; ok=0; fi; }
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq >/dev/null
@@ -32,8 +33,8 @@ chk "real ALSA (not an OSS stand-in)" "dpkg -l | grep -qE \"^ii  libasound2(t64)
 for c in coptersim coptersim-ui rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-apmsitlrun rfly-python rfly-python-run rfly-flightgear rfly-import-data rfly-closeall rfly-udpportfree rfly-comlist; do
   command -v $c >/dev/null || { echo "missing command $c"; ok=0; }
 done
-chk "16 commands on PATH" "true"
-chk "13 menu entries" "[ \$(ls /usr/share/applications | grep -c ^rflytools-) = 13 ]"
+chk "17 commands on PATH" "true"
+chk "$NAPPS menu entries" "[ \$(ls /usr/share/applications | grep -c ^rflytools-) = $NAPPS ]"
 useradd -m pilot
 cat >/tmp/user.sh <<"EOF"
 # Runs as a normal user. Each check is a function, so no nested quoting.
@@ -51,7 +52,7 @@ c_saves() { test -f ~/.local/share/rflygame/leaderboard.txt; }
 c_server() { rflygame-server --port 27199 >/tmp/srv.log 2>&1 & local p=$!; sleep 1; kill $p; grep -q 27199 /tmp/srv.log; }
 c_untar() { tar -xzf /dist/rflytools-$VER-linux-$UARCH.tar.gz -C ~ && "$D/install.sh"; }
 c_paths() { grep -q "ROOT=\"$D\"" "$D/RflyTools/bin/RflySim3D" && ! grep -rq @RFLY_ROOT@ "$D/RflyTools"; }
-c_menu() { [ "$(ls ~/.local/share/applications | grep -c "^rflytools-")" = 13 ]; }
+c_menu() { [ "$(ls ~/.local/share/applications | grep -c "^rflytools-")" = "$NAPPS" ]; }
 c_cmds() { [ -x ~/.local/bin/rfly-sitlrun ] && ~/.local/bin/coptersim --help; }
 c_move() { mv "$D" ~/moved && ~/moved/install.sh && grep -q "ROOT=\"$HOME/moved\"" ~/moved/RflyTools/bin/RflySim3D; }
 c_tarview() { x ~/.local/bin/rflysim3d --screenshot /tmp/v2.png --after 3 && test -s /tmp/v2.png; }
@@ -66,14 +67,14 @@ check "RflyGame saves in ~/.local/share/rflygame" c_saves
 check "rflygame-server starts" c_server
 check "tarball: unpack + install.sh" c_untar
 check "tarball: launchers point at the unpack folder" c_paths
-check "tarball: 13 menu entries" c_menu
+check "tarball: $NAPPS menu entries" c_menu
 check "tarball: commands in ~/.local/bin" c_cmds
 check "tarball: install.sh again after moving the folder" c_move
 check "tarball: rflysim3d renders" c_tarview
 check "tarball: uninstall" c_uninst
 exit $((1 - ok))
 EOF
-su - pilot -c "VER=$VER UARCH=$UARCH bash /tmp/user.sh" || ok=0
+su - pilot -c "VER=$VER NAPPS=$NAPPS UARCH=$UARCH bash /tmp/user.sh" || ok=0
 chk "apt remove" "apt-get remove -y -qq rflytools >/dev/null 2>&1 && [ ! -e /opt/rflytools/bin ] && ! command -v coptersim >/dev/null"
 exit $((1 - ok))' || FAIL=1
 done
