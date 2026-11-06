@@ -20,12 +20,13 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
 | HITLRun | 🟡 Script + coptersim MAVLink relay (QGC 14550, Python 20100/20101). Untested, no Pixhawk |
 | FlightGear-F450 | 🟡 `coptersim --fg` (FGNetFDM v24, tested by unit test) + F450 model from ISO. FlightGear not installed (needs ~2 GB) |
 | Serial HIL (Pixhawk) | 🟡 Wired (`--link serial:...`), untested |
-| Hexa/Octo/Tri/Y6 frames | ⏳ Physics is quad only; the viewer draws hexa/octo/plane/car |
+| Hexa/Octo/Tri/Y6 frames | ✅ quad X/+, hexa X, octo X, Y6 fly in PX4 SITL; tricopter not modelled |
 | **Linux support** | ✅ Debian 12 arm64 container: test_all **A–G all PASS incl. PX4 v1.17 SITL**. `.desktop` launchers, tarball package |
 | **Installers** | ✅ macOS `.pkg` (universal); Linux `.deb` + tarball (amd64, arm64). Linux packages install-tested on Ubuntu 24.04 / Debian 12 |
 | **GitHub** | ✅ Public: github.com/Dankwa-Wadie/rflysim-mac-linux |
+| **Windows parity** | 🟡 Audit + plan: docs/WINDOWS_PARITY.md (27 ✅, 9 ❌ left: fixed wing, ArduPilot, ROS, DistSim, …) |
 | **Updates** | ✅ v0.2.0: daily check + `rfly-update` (signed), APT repo, CI release pipeline. CI green; tag v0.2.0 → draft release; publishing is the user's step |
-| GUI (vehicle configurator) | ⏳ |
+| GUI (vehicle configurator) | ✅ CopterSim window (`coptersim-ui`) |
 | Model-DLL ABI | ⏳ |
 
 ## Decisions
@@ -529,6 +530,33 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
   without editing ~/.docker/config.json.
 - Tagged v0.2.0 → release workflow: all 4 jobs green (macOS job really installs/uninstalls the pkg), draft v0.2.0 with 5 packages + SHA256SUMS.txt. Publishing (`scripts/publish_release.sh v0.2.0`) is the user's step.
 - Later: actions/checkout@v4 etc. target Node 20 (deprecated; GitHub runs them on Node 24 for now).
+
+## 2026-11-06 — Windows parity (user: "make everything the same as on Windows")
+- Audit from the ISO, the original CopterSim under Wine and RflySim's public docs (BAT reference: 31 + 20 scripts,
+  some "Full version only") → docs/WINDOWS_PARITY.md. User: free-version features first, then paid equivalents.
+- **CopterSim window** (`crates/coptersim-ui`, own form toolkit with searchable dropdowns): Windows layout;
+  RflySim catalog (now with ESCs, motor/battery electrical data) or custom design; frames; estimates from
+  `rflygame::design` (eCalc-style; matched to RflySim's stored F450 hover numbers: 17.1 min / 57 % / 4.1 A /
+  5500 rpm vs 18 / 60.9 / 3.74 / 5236; shaft torque calibrated 0.62·Cm); Model Parameter; Assembled UAV Database
+  (RflySim planeItems + user records); SITL/HITL/external start with live state (coptersim `--status-port`, 10 Hz).
+  Verified: Start ran PX4 SITL with the configured F450, PX4 hovered it at 0.58 throttle (estimate 57 %).
+- coptersim: `--params-file` (frame + 14 modelInfo values), `--status-port`, `--udp-mode 0..6`, `--px4-mav`,
+  `--frame`, `--print-px4-params`, `--ue4-ip` as IS_BROADCAST (0/1/IP list), model type from frame.
+- **UDPSIMMODE**: UDP_Full/UDP_Simple bridge (`udp_bridge.rs`, RflySimSDK packet formats; switches PX4 to
+  OFFBOARD when setpoints stream), Mavlink_Simple (filtered/lower rate), NoSend, NoGPS (no HIL_GPS), Vision
+  (ODOMETRY + EKF2_EV_CTRL/HGT_REF). SDK port: InitMavLoop(0/1). All modes flown in PX4 SITL (hover + move).
+- **Frames**: quad X/+, hexa X, octo X, Y6 in rfly-core; PX4 gets CA_* geometry + PWM_MAIN_FUNC/HIL_ACT_FUNC from
+  coptersim. All four flown in PX4 SITL.
+- **Scripts**: SITLRun (Windows variables, prompt, Enter stops, positions/ask-pos, broadcast, vehicle type,
+  frame, UDP mode), HITLRun (port prompt with recommended list, --auto, --sysid, baud), ComList, CloseALL,
+  UdpPortFree, Python38Run, PX4Build (PX4CMD; board list works; real build needs the Arm compiler), launchers
+  SITLRunLowGPU/HITLRunLowGPU/CloseALL, viewer --low-gpu / map LowGPU, viewer `-key=` / `-cmd=`.
+- **Bugs found**: PX4 keeps parameters per instance → mode/frame params leaked between runs (now set/reset every
+  run); SITLRun's idle `sleep` delayed its stop trap (now `wait`); PX4 could miss SIGTERM while starting (force
+  after 3 s); v1.17 SITL output params are PWM_MAIN_FUNC (not HIL_ACT_FUNC); landed models sank into the pad
+  (viewer now stands models on their landing gear); CopterSim status parsing.
+- Not done yet: fixed wing (SITLRunFw), ArduPilot SITL (paid equivalent), RflySim3D.txt config, UE4 scenes
+  (OldFactory), SITLPosAlt, MAVROS (Linux), DistSim, cfclient, model-DLL plug-in, tricopter.
 
 ## Next steps
 0. When a licensed MATLAB is installed: run the RflyMac install + quicktest + example model. Fix anything MATLAB-specific.

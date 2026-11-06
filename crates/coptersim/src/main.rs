@@ -25,9 +25,15 @@ struct Args {
     /// RflySim CopterID (1-based). Selects the PX4 TCP port and the RflySim UDP ports.
     #[arg(long, default_value_t = 1)]
     id: u32,
-    /// RflySim3D vehicle type (3 = quadcopter).
-    #[arg(long, default_value_t = 3)]
-    vehicle_type: i32,
+    /// RflySim3D vehicle type (3D model): default from the frame (3 quad, 5 hexa, 8 octo).
+    #[arg(long)]
+    vehicle_type: Option<i32>,
+    /// Frame (overrides the parameter file): quad_x, quad_plus, hexa_x, octo_x, y6.
+    #[arg(long, value_parser = |s: &str| rfly_core::Frame::parse(s).ok_or_else(|| format!("unknown frame {s}")))]
+    frame: Option<rfly_core::Frame>,
+    /// Print the PX4 parameters (control allocation, HIL outputs) for this vehicle's frame and exit.
+    #[arg(long)]
+    print_px4_params: bool,
     /// Initial NED position offset (m) and yaw (deg), like CopterSim's initial X/Y/Yaw boxes.
     #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
     init_x: f64,
@@ -35,7 +41,8 @@ struct Args {
     init_y: f64,
     #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
     init_yaw: f64,
-    /// Host running RflySim3D (vehicle state goes to UDP 20010.. on this host).
+    /// Where RflySim3D runs (vehicle state goes to UDP 20010..), as RflySim's IS_BROADCAST: `0` this computer,
+    /// `1` broadcast to the LAN (LANSwarm), an IP, or a comma-separated list of IPs.
     #[arg(long, default_value = "127.0.0.1")]
     ue4_ip: String,
     /// Number of RflySim3D windows to feed (20010, 20011, ...).
@@ -137,7 +144,17 @@ const HEARTBEAT_EVERY: u64 = 1000; // 1 Hz
 fn main() {
     let args = Args::parse();
 
-    let params = load_params(&args);
+    let mut params = load_params(&args);
+    if let Some(f) = args.frame {
+        params.frame = f;
+    }
+    if args.print_px4_params {
+        for (k, v) in params.frame.px4_params(params.arm) {
+            println!("{k} {v}");
+        }
+        return;
+    }
+    println!("coptersim: frame {} ({} rotors)", params.frame.label(), params.frame.rotors().len());
     println!(
         "coptersim: mass {:.2} kg, arm {:.3} m, hover throttle {:.3}",
         params.mass,
@@ -150,7 +167,7 @@ fn main() {
         None
     } else {
         let windows = if args.no_rfly { 0 } else { args.ue4_windows };
-        match rfly_out::RflyOut::new(args.id, args.vehicle_type, &args.ue4_ip, windows, home)
+        match rfly_out::RflyOut::new(args.id, args.vehicle_type.unwrap_or(params.frame.rflysim3d_type()), &args.ue4_ip, windows, home)
             .and_then(|mut o| {
                 if let Some(fg) = &args.fg {
                     o.fg = Some(fg_out::FgOut::new(fg, home)?);

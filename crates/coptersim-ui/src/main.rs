@@ -75,6 +75,27 @@ impl Catalog {
     }
 }
 
+/// RflySim's planeItems frame names.
+fn frame_token(f: Frame) -> &'static str {
+    match f {
+        Frame::QuadX => "QUAD",
+        Frame::QuadPlus => "QUADP",
+        Frame::HexaX => "HEXA",
+        Frame::OctoX => "OCTO",
+        Frame::Y6 => "Y6A",
+    }
+}
+
+fn frame_from_token(t: &str) -> Frame {
+    match t.trim().to_ascii_uppercase().as_str() {
+        "QUADP" => Frame::QuadPlus,
+        "HEXA" => Frame::HexaX,
+        "OCTO" | "OCTO_QUAD" => Frame::OctoX,
+        "Y6A" | "Y6" => Frame::Y6,
+        _ => Frame::QuadX,
+    }
+}
+
 fn brands<T>(v: &[T], f: impl Fn(&T) -> &str) -> Vec<String> {
     let mut b: Vec<String> = v.iter().map(|x| f(x).to_string()).collect();
     b.dedup();
@@ -199,6 +220,7 @@ struct App {
     root: PathBuf,
     cat: Option<Catalog>,
     custom: bool,
+    frame: usize,
     // configurator fields
     name: String,
     mass: String,
@@ -254,6 +276,7 @@ impl App {
         let mut a = App {
             root: tools_root(),
             custom: cat.is_none(),
+            frame: 0,
             cat,
             name: "My quadcopter".into(),
             mass: "1.5".into(),
@@ -330,6 +353,7 @@ impl App {
             self.name = name;
             (self.mass, self.diag, self.alt, self.temp) = (g(0), g(1), g(2), g(3));
             (self.c_kv, self.c_rm, self.c_i0, self.c_pd, self.c_pp, self.c_esc, self.c_cells, self.c_mah, self.c_c) = (g(4), g(5), g(6), g(7), g(8), g(9), g(10), g(11), g(12));
+            self.frame = Frame::ALL.iter().position(|f| *f == frame_from_token(&g(13))).unwrap_or(0);
             self.message = format!("Loaded {}", self.name);
             return;
         }
@@ -339,6 +363,7 @@ impl App {
         };
         let head: Vec<&str> = item.split(';').next().unwrap_or("").split(',').collect();
         self.custom = false;
+        self.frame = Frame::ALL.iter().position(|f| *f == frame_from_token(head.first().copied().unwrap_or("QUAD"))).unwrap_or(0);
         self.name = name;
         self.mass = format!("{}", af.mass_kg);
         self.diag = format!("{}", af.wheelbase_mm);
@@ -393,18 +418,20 @@ impl App {
                 Self::picked(&c.batteries, &self.battery, |x| &x.brand).cloned().ok_or("choose a battery")?,
             )
         };
-        Ok(Design { name: self.name.clone(), frame: Frame::QuadX, mass_kg: mass, wheelbase_mm: diag, altitude_m: alt, temp_c: temp, motor, prop, esc, battery })
+        Ok(Design { name: self.name.clone(), frame: Frame::ALL[self.frame.min(Frame::ALL.len() - 1)], mass_kg: mass, wheelbase_mm: diag, altitude_m: alt, temp_c: temp, motor, prop, esc, battery })
     }
 
     fn db_record(&self, d: &Design) -> String {
         if self.custom {
             format!(
-                "CUSTOM,{},{},{},{},{},{},{},{},{},{},{},{},{}",
-                self.mass, self.diag, self.alt, self.temp, self.c_kv, self.c_rm, self.c_i0, self.c_pd, self.c_pp, self.c_esc, self.c_cells, self.c_mah, self.c_c
+                "CUSTOM,{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                self.mass, self.diag, self.alt, self.temp, self.c_kv, self.c_rm, self.c_i0, self.c_pd, self.c_pp, self.c_esc, self.c_cells, self.c_mah, self.c_c,
+                frame_token(d.frame)
             )
         } else {
             format!(
-                "QUAD,0,{},{},{},{},1;10,85,90,0.5;{},{},,,,,,,,;{},{},,,,;{},{},,,,;{},{},1,1,,,,,,,",
+                "{},0,{},{},{},{},1;10,85,90,0.5;{},{},,,,,,,,;{},{},,,,;{},{},,,,;{},{},1,1,,,,,,,",
+                frame_token(d.frame),
                 d.mass_kg, d.wheelbase_mm, d.altitude_m, d.temp_c, d.motor.brand, d.motor.model, d.prop.brand, d.prop.model, d.esc.brand, d.esc.model, d.battery.brand, d.battery.model
             )
         }
@@ -578,8 +605,8 @@ async fn main() {
         row_label(&ui, "Name", x0, y);
         ui.field(id("name", 0), Rect::new(x0 + 110.0, y, 200.0, 24.0), &mut app.name);
         row_label(&ui, "Frame", x0 + 330.0, y);
-        let mut frame = 0usize;
-        ui.dropdown(id("frame", 0), Rect::new(x0 + 390.0, y, 220.0, 24.0), &["Quadcopter (X)".to_string()], &mut frame);
+        let frames: Vec<String> = Frame::ALL.iter().map(|f| f.label().to_string()).collect();
+        ui.dropdown(id("frame", 0), Rect::new(x0 + 390.0, y, 220.0, 24.0), &frames, &mut app.frame);
         y += ROW + 6.0;
         for (k, (lbl, unit, val)) in [("Total weight", "kg", &mut app.mass), ("Diagonal size", "mm", &mut app.diag), ("Altitude", "m", &mut app.alt), ("Temperature", "°C", &mut app.temp)].into_iter().enumerate() {
             let (cx, cy) = (x0 + (k % 2) as f32 * 310.0, y + (k / 2) as f32 * (ROW + 6.0));

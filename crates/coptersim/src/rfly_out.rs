@@ -22,10 +22,28 @@ pub struct RflyOut {
 }
 
 impl RflyOut {
-    /// `ue4_ip` = where RflySim3D runs; `windows` = how many windows (20010..) to feed.
+    /// `ue4_ip` = where RflySim3D runs, as RflySim's IS_BROADCAST: `0` (this computer), `1` (broadcast to the LAN),
+    /// an IP, or a comma-separated list of IPs. `windows` = how many windows (20010..) to feed on each.
     pub fn new(id: u32, vtype: i32, ue4_ip: &str, windows: u16, home: Home) -> std::io::Result<Self> {
         let sock = UdpSocket::bind("0.0.0.0:0")?;
-        let ue4 = (0..windows).map(|w| format!("{ue4_ip}:{}", UE4_BASE_PORT + w).parse()).collect::<Result<_, _>>().map_err(std::io::Error::other)?;
+        sock.set_broadcast(true)?;
+        let hosts: Vec<&str> = ue4_ip
+            .split(',')
+            .map(str::trim)
+            .filter(|h| !h.is_empty())
+            .map(|h| match h {
+                "0" | "local" => "127.0.0.1",
+                "1" | "broadcast" => "255.255.255.255",
+                h => h,
+            })
+            .collect();
+        let mut ue4 = vec![];
+        for h in &hosts {
+            for w in 0..windows {
+                ue4.push(format!("{h}:{}", UE4_BASE_PORT + w).parse().map_err(|e| std::io::Error::other(format!("{h}: {e}")))?);
+            }
+        }
+        let ue4_ip = hosts.join(",");
         let true_to = format!("127.0.0.1:{}", true_port(id) + 1).parse().unwrap();
         println!(
             "coptersim: RflySim outputs: vehicle #{id} → RflySim3D {ue4_ip}:{}..{}, true data → {true_to}",
