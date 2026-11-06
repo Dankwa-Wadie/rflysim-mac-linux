@@ -29,11 +29,11 @@ apt-get update -qq >/dev/null
 chk "apt install .deb" "apt-get install -y -qq /dist/rflytools_${VER}_${ARCH}.deb >/tmp/apt.log 2>&1"
 apt-get install -y -qq xvfb xauth libgl1-mesa-dri >/dev/null 2>&1
 chk "real ALSA (not an OSS stand-in)" "dpkg -l | grep -qE \"^ii  libasound2(t64)?[: ]\""
-for c in coptersim rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-python rfly-flightgear rfly-import-data; do
+for c in coptersim coptersim-ui rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-python rfly-python-run rfly-flightgear rfly-import-data rfly-closeall rfly-udpportfree rfly-comlist; do
   command -v $c >/dev/null || { echo "missing command $c"; ok=0; }
 done
-chk "11 commands on PATH" "true"
-chk "10 menu entries" "[ \$(ls /usr/share/applications | grep -c ^rflytools-) = 10 ]"
+chk "16 commands on PATH" "true"
+chk "13 menu entries" "[ \$(ls /usr/share/applications | grep -c ^rflytools-) = 13 ]"
 useradd -m pilot
 cat >/tmp/user.sh <<"EOF"
 # Runs as a normal user. Each check is a function, so no nested quoting.
@@ -51,7 +51,7 @@ c_saves() { test -f ~/.local/share/rflygame/leaderboard.txt; }
 c_server() { rflygame-server --port 27199 >/tmp/srv.log 2>&1 & local p=$!; sleep 1; kill $p; grep -q 27199 /tmp/srv.log; }
 c_untar() { tar -xzf /dist/rflytools-$VER-linux-$UARCH.tar.gz -C ~ && "$D/install.sh"; }
 c_paths() { grep -q "ROOT=\"$D\"" "$D/RflyTools/bin/RflySim3D" && ! grep -rq @RFLY_ROOT@ "$D/RflyTools"; }
-c_menu() { [ "$(ls ~/.local/share/applications | grep -c "^rflytools-")" = 10 ]; }
+c_menu() { [ "$(ls ~/.local/share/applications | grep -c "^rflytools-")" = 13 ]; }
 c_cmds() { [ -x ~/.local/bin/rfly-sitlrun ] && ~/.local/bin/coptersim --help; }
 c_move() { mv "$D" ~/moved && ~/moved/install.sh && grep -q "ROOT=\"$HOME/moved\"" ~/moved/RflyTools/bin/RflySim3D; }
 c_tarview() { x ~/.local/bin/rflysim3d --screenshot /tmp/v2.png --after 3 && test -s /tmp/v2.png; }
@@ -66,7 +66,7 @@ check "RflyGame saves in ~/.local/share/rflygame" c_saves
 check "rflygame-server starts" c_server
 check "tarball: unpack + install.sh" c_untar
 check "tarball: launchers point at the unpack folder" c_paths
-check "tarball: 10 menu entries" c_menu
+check "tarball: 13 menu entries" c_menu
 check "tarball: commands in ~/.local/bin" c_cmds
 check "tarball: install.sh again after moving the folder" c_move
 check "tarball: rflysim3d renders" c_tarview

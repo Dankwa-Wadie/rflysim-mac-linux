@@ -1,0 +1,13 @@
+[package]
+name = "coptersim-ui"
+description = "CopterSim window: vehicle configurator, design estimates and simulation launcher (RflySim CopterSim GUI for macOS/Linux)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+macroquad = { version = "0.4", default-features = false }
+rfly-core = { path = "../rfly-core" }
+rfly-db = { path = "../rfly-db" }
+rflygame = { path = "../rflygame" }
+rflysim3d = { path = "../rflysim3d" }

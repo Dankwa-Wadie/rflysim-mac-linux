@@ -29,8 +29,8 @@ jobs:
         run: |
           VER=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           sudo installer -pkg "dist/RflyTools-$VER-macOS.pkg" -target /
-          test "$(ls -d /Applications/RflyTools/*.app | wc -l | tr -d ' ')" = 10
-          for c in coptersim rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-python rfly-flightgear rfly-import-data; do command -v "$c"; done
+          test "$(ls -d /Applications/RflyTools/*.app | wc -l | tr -d ' ')" = 13
+          for c in coptersim coptersim-ui rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-python rfly-python-run rfly-flightgear rfly-import-data rfly-closeall rfly-udpportfree rfly-comlist; do command -v "$c"; done
           test "$(rfly-update --version)" = "rfly-update $VER"
           lipo -archs /Library/RflyTools/bin/coptersim | grep -q x86_64
           coptersim --help >/dev/null

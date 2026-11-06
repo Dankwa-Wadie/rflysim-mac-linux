@@ -205,7 +205,16 @@ def icon_update():
     quad(img, 1024, 1000, 300, (120, 230, 170), (120, 230, 170), 40)
     return img
 
+def icon_closeall():
+    img = base((215, 70, 60), (150, 30, 30))
+    pts = np.array([[1024 + 560 * np.cos(np.deg2rad(22.5 + 45 * k)), 1024 + 560 * np.sin(np.deg2rad(22.5 + 45 * k))] for k in range(8)], np.int32)
+    cv2.fillPoly(img, [pts], bgr((250, 250, 250)), cv2.LINE_AA)
+    cv2.fillPoly(img, [((pts - 1024) * 0.86 + 1024).astype(np.int32)], bgr((200, 45, 40)), cv2.LINE_AA)
+    text(img, "ALL", 1024, 1130, 7.5, (255, 255, 255), 30)
+    return img
+
 ICONS = {
+    "CloseALL": icon_closeall,
     "Update": icon_update,
     "ImportData": icon_import,
     "RflyGame": icon_game,

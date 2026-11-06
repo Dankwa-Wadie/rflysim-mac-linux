@@ -124,10 +124,14 @@ app "RflyGame"            RflyGame        gui  '"$(rfly_bin rflygame)"'
 app "RflySim3D"           RflySim3D       gui  '"$(rfly_bin rflysim3d)"'
 app "3DDisplay"           3DDisplay       gui  '"$(rfly_bin rflysim3d)" --map Blank'
 app "FlightGear-F450"     FlightGear-F450 term '"$ROOT/scripts/FlightGearF450.sh"'
-app "CopterSim"           CopterSim       term 'rfly_set_dbarg; "$(rfly_bin coptersim)" ${DBARG[@]+"${DBARG[@]}"}'
+app "CopterSim"           CopterSim       gui  '"$(rfly_bin coptersim-ui)"'
 app "SITLRun"             SITLRun         term "$ASK_N
 \"\$ROOT/scripts/SITLRun.sh\" \"\$N\" --qgc"
-app "HITLRun"             HITLRun         term '"$ROOT/scripts/HITLRun.sh"'
+app "SITLRunLowGPU"       SITLRun         term "$ASK_N
+\"\$ROOT/scripts/SITLRun.sh\" \"\$N\" --qgc --low-gpu"
+app "HITLRun"             HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc'
+app "HITLRunLowGPU"       HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc --low-gpu'
+app "CloseALL"            CloseALL        term '"$ROOT/scripts/CloseALL.sh"'
 app "Python38Env"         Python38Env     term '"$ROOT/scripts/Python38Env.sh"'
 app "Import RflySim Data" ImportData      term '"$ROOT/scripts/import_rflysim_data.sh"'
 app "Update RflyTools"    Update          term '"$(rfly_bin rfly-update)"'
