@@ -563,13 +563,16 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
   does not reset it, so with a 488 m home the plane sank; fixed-wing runs use home altitude 0 m. A takeoff sent
   while the EKF is still resetting its origin gets a takeoff waypoint at lat/lon 0,0 and never ends: wait
   ~15 s after "Ready for takeoff". HITL on a Pixhawk not tested (no board).
-- **ArduPilot SITL** (Windows APMSITLRun / APMSITLRun_Plane, paid there): in progress. `coptersim --ardupilot
+- **ArduPilot SITL** (Windows APMSITLRun / APMSITLRun_Plane, paid there): done. `coptersim --ardupilot
   [PORT]` serves ArduPilot's JSON physics interface (lockstep servo packets in, IMU/pose JSON out); copter
   motors mapped by arm angle and spin (quad X/+, hexa X; ArduPilot's octo X spins the other way, Y6 numbering
-  differs), plane surfaces from ArduPlane's default channels. `scripts/APMSITLRun.sh [N] [--plane]` starts
-  coptersim + arducopter/arduplane + RflySim3D, QGC on UDP 14550. Unit-tested; not flown yet (needs an
-  ArduPilot build in ~/tools/ardupilot).
-- Not done yet: ArduPilot SITL flight test (paid equivalent), RflySim3D.txt config, UE4 scenes
+  differs), plane surfaces from ArduPlane's default channels, ArduPlane cruise/trim params for the model.
+  `scripts/APMSITLRun.sh [N] [--plane]` (coptersim + arducopter/arduplane + RflySim3D; QGC on UDP 14550),
+  CopterSim window mode "APM_SITL", APMSITLRun/APMSITLRun_Plane launchers, `rfly-apmsitlrun`.
+  `scripts/test_ardupilot.py` (also test_all stage H): ArduCopter quad + hexa GUIDED takeoff to 10 m, hold,
+  LAND; ArduPlane TAKEOFF to 40 m then loiter at 15 m/s, all PASS with ArduPilot Copter-4.7.2 in
+  ~/tools/ardupilot (1.3 GB checkout + build; pexpect added to ~/tools/px4-venv for the build).
+- Not done yet: RflySim3D.txt config, UE4 scenes
   (OldFactory), SITLPosAlt, MAVROS (Linux), DistSim, cfclient, model-DLL plug-in, tricopter.
 
 ## Next steps

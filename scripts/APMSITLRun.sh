@@ -11,12 +11,13 @@
 #                         ./waf configure --board sitl && ./waf copter plane
 #   --start-index I, --interval M, --origin X Y, --yaw DEG, --map NAME, --no-3d, --low-gpu, --qgc
 #   --home LAT,LON,ALT    home location (default RflySim's 47.397742,8.545594,488)
+#   --params-file FILE, --status-port P    vehicle parameters (CopterSim window) and live state port (as SITLRun)
 #   MAVLink: instance k: QGC on UDP 14550 (all vehicles, SYSID_THISMAV = CopterID), and TCP 5760 + 10k.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/platform.sh"
 APM_DIR="${ARDUPILOT_DIR:-$HOME/tools/ardupilot}"
-N=""; START=1; SPACING=2; OX=0; OY=0; YAW=0; MAP="Grasslands"; NO3D=0; LOWGPU=0; QGC=0; PLANE=0; FRAME=""
+N=""; START=1; SPACING=2; OX=0; OY=0; YAW=0; MAP="Grasslands"; NO3D=0; LOWGPU=0; QGC=0; PLANE=0; FRAME=""; PARAMS=""; STATUS=""
 HOME_LOC="47.397742,8.545594,488"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -32,6 +33,8 @@ while [ $# -gt 0 ]; do
     --no-3d) NO3D=1 ;;
     --low-gpu) LOWGPU=1; MAP="LowGPU" ;;
     --qgc) QGC=1 ;;
+    --params-file) PARAMS="$2"; shift ;;
+    --status-port) STATUS="$2"; shift ;;
     -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     -*) echo "APMSITLRun: unknown option $1"; exit 1 ;;
     *) N="$1" ;;
@@ -44,7 +47,7 @@ fi
 case "$N" in ''|*[!0-9]*) echo "APMSITLRun: the vehicle count must be a number"; exit 1 ;; esac
 [ "$N" -ge 1 ] || N=1
 
-if [ "$PLANE" = 1 ]; then VEH=arduplane; PARM=plane.parm; else VEH=arducopter; PARM=copter.parm; fi
+if [ "$PLANE" = 1 ]; then VEH=arduplane; PARM=models/plane.parm; else VEH=arducopter; PARM=default_params/copter.parm; fi
 APM_BIN="$APM_DIR/build/sitl/bin/$VEH"
 SIM="$(rfly_bin coptersim)"; VIEW="$(rfly_bin rflysim3d)"
 LOG="$(rfly_logs apm)"; rfly_set_dbarg
@@ -61,6 +64,7 @@ if pgrep -f "build/sitl/bin/ardu" >/dev/null || pgrep -x coptersim >/dev/null; t
   exit 1
 fi
 SIMF=(); [ "$PLANE" = 1 ] && SIMF+=(--fixed-wing); [ -n "$FRAME" ] && SIMF+=(--frame "$FRAME")
+[ -n "$PARAMS" ] && SIMF+=(--params-file "$PARAMS")
 FRAME_PARAMS="$("$SIM" --print-ardupilot-params ${SIMF[@]+"${SIMF[@]}"} ${DBARG[@]+"${DBARG[@]}"})" || exit 1
 
 PIDS=()
@@ -91,14 +95,14 @@ for k in $(seq 0 $((N - 1))); do
   VHOME=$(awk -v la="$HLAT" -v lo="$HLON" -v x="$X" -v y="$Y" 'BEGIN { pi = atan2(0, -1);
     printf "%.7f,%.7f", la + x / 6378137 * 180 / pi, lo + y / (6378137 * cos(la * pi / 180)) * 180 / pi }')
   "$SIM" --id "$i" --ardupilot $((9002 + 10 * inst)) ${SIMF[@]+"${SIMF[@]}"} ${DBARG[@]+"${DBARG[@]}"} \
-      --lat "${VHOME%,*}" --lon "${VHOME#*,}" --alt "$HALT" --init-yaw="$YAW" \
+      $([ -n "$STATUS" ] && echo "--status-port $((STATUS + k))") --lat "${VHOME%,*}" --lon "${VHOME#*,}" --alt "$HALT" --init-yaw="$YAW" \
       ${SIM_ARGS:-} >"$LOG/coptersim_$i.log" 2>&1 &
   PIDS+=("$!")
   WD="$LOG/instance_$inst"; mkdir -p "$WD"
   { echo "SYSID_THISMAV $i"; echo "$FRAME_PARAMS"; } >"$WD/rflytools.parm"
   # -w: wipe the stored parameters each run (defaults + ours), as SITLRun resets PX4's.
   (cd "$WD" && exec "$APM_BIN" -w --model "JSON:127.0.0.1" --speedup 1 -I "$inst" \
-      --home "$VHOME,$HALT,$YAW" --defaults "$APM_DIR/Tools/autotest/default_params/$PARM,$WD/rflytools.parm" \
+      --home "$VHOME,$HALT,$YAW" --defaults "$APM_DIR/Tools/autotest/$PARM,$WD/rflytools.parm" \
       --serial0 "tcp:$((0))" --serial1 "udpclient:127.0.0.1:14550" ${APM_ARGS:-}) >"$LOG/ardupilot_$i.log" 2>&1 &
   PIDS+=("$!")
   echo "APMSITLRun: vehicle #$i ($VEH, instance $inst): JSON UDP $((9002 + 10 * inst)), MAVLink TCP $((5760 + 10 * inst)) and UDP 14550"

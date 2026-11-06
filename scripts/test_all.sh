@@ -5,11 +5,12 @@
 #   D SITLRun + Python offboard/camera + MAVLink relay (HIL path, relayed from SITL)
 #   E bdsim block diagram flying live in rflysim3d            F RflyTools launchers (.app / .desktop)
 #   G RflyGame: race, missions, flight school, collisions, 2-player multiplayer (autopilot)
-# Usage: scripts/test_all.sh [stages, default ABCDEF]
+#   H PX4 fixed wing (SITLRunFw) + ArduPilot copter/plane (APMSITLRun; skipped without an ArduPilot build)
+# Usage: scripts/test_all.sh [stages, default ABCDEFGH]
 set -u
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
-STAGES="${1:-ABCDEFG}"
+STAGES="${1:-ABCDEFGH}"
 PY="$HOME/tools/rflysim-py/bin/python"
 OUT="$ROOT/logs/test_all"; rm -rf "$OUT"; mkdir -p "$OUT"
 SIM=target/release/coptersim; VIEW=target/release/rflysim3d
@@ -21,7 +22,7 @@ if pgrep -f "bin/px4( |$)" >/dev/null || pgrep -x coptersim >/dev/null || pgrep 
   echo "Stop running px4/coptersim/rflysim3d first."; exit 1
 fi
 cargo build --release -q 2>&1 | tail -3
-case "$STAGES" in *[CDEG]*) [ -x "$PY" ] || scripts/Python38Env.sh -c "print('Python env ready')" ;; esac
+case "$STAGES" in *[CDEGH]*) [ -x "$PY" ] || scripts/Python38Env.sh -c "print('Python env ready')" ;; esac
 
 has() { case "$STAGES" in *"$1"*) return 0 ;; esac; return 1; }
 # Waits up to 10 s for the viewer process (a freshly rebuilt .app can take a few seconds to start).
@@ -174,6 +175,19 @@ if has G; then
   [ "$(echo "$vp" | grep -o 'Virtual_controller_[1-4]:[A-Za-z]*:armed=true,alt=[1-9]' | wc -l | tr -d ' ')" = 4 ] && echo "$vp" | grep -q "Virtual_controller_4:Beginner" \
     && glines="$glines ok:vpad" || { gok=0; glines="$glines FAIL:vpad"; }
   [ $gok = 1 ] && res G "PASS RflyGame ($glines )" || res G "FAIL RflyGame ($glines )"
+fi
+
+if has H; then
+  echo "== H: fixed wing + ArduPilot"
+  hl=""; hok=1
+  scripts/test_fixedwing.sh 60 >"$OUT/H_fixedwing.log" 2>&1 && hl="$hl ok:px4-plane" || { hok=0; hl="$hl FAIL:px4-plane"; }
+  if [ -x "${ARDUPILOT_DIR:-$HOME/tools/ardupilot}/build/sitl/bin/arducopter" ]; then
+    "$PY" scripts/test_ardupilot.py both >"$OUT/H_ardupilot.log" 2>&1 && hl="$hl ok:apm-copter ok:apm-plane" \
+      || { hok=0; hl="$hl FAIL:ardupilot($(grep -c '^FAIL' "$OUT/H_ardupilot.log"))"; }
+  else
+    hl="$hl skip:ardupilot(not built)"
+  fi
+  [ $hok = 1 ] && res H "PASS fixed wing / ArduPilot ($hl )" || res H "FAIL fixed wing / ArduPilot ($hl )"
 fi
 
 echo; echo "========== SUMMARY =========="

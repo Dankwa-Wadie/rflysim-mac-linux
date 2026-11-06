@@ -131,6 +131,10 @@ app "SITLRunLowGPU"       SITLRun         term "$ASK_N
 \"\$ROOT/scripts/SITLRun.sh\" \"\$N\" --qgc --low-gpu"
 app "SITLRunFw"           SITLRun         term "$ASK_N
 \"\$ROOT/scripts/SITLRun.sh\" \"\$N\" --qgc --fixed-wing"
+app "APMSITLRun"          SITLRun         term "$ASK_N
+\"\$ROOT/scripts/APMSITLRun.sh\" \"\$N\" --qgc"
+app "APMSITLRun_Plane"    SITLRun         term "$ASK_N
+\"\$ROOT/scripts/APMSITLRun.sh\" \"\$N\" --qgc --plane"
 app "HITLRun"             HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc'
 app "HITLRunFw"           HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc --fixed-wing'
 app "HITLRunLowGPU"       HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc --low-gpu'

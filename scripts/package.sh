@@ -21,7 +21,7 @@ VER="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
 DIST="$ROOT/dist"; mkdir -p "$DIST"
 BINS="coptersim coptersim-ui rflysim3d rflygame rflygame-server rflygame-netem rfly-update"
 # Commands on PATH that run a script (symlinks would break the scripts' own ROOT lookup).
-WRAPPERS="rfly-sitlrun:SITLRun.sh rfly-hitlrun:HITLRun.sh rfly-python:Python38Env.sh rfly-python-run:Python38Run.sh rfly-flightgear:FlightGearF450.sh rfly-import-data:import_rflysim_data.sh rfly-closeall:CloseALL.sh rfly-udpportfree:UdpPortFree.sh rfly-comlist:ComList.sh"
+WRAPPERS="rfly-sitlrun:SITLRun.sh rfly-hitlrun:HITLRun.sh rfly-apmsitlrun:APMSITLRun.sh rfly-python:Python38Env.sh rfly-python-run:Python38Run.sh rfly-flightgear:FlightGearF450.sh rfly-import-data:import_rflysim_data.sh rfly-closeall:CloseALL.sh rfly-udpportfree:UdpPortFree.sh rfly-comlist:ComList.sh"
 
 # ---------- on a Mac: build the Linux packages in containers ----------
 if [ "${1:-}" = --linux ]; then
@@ -60,7 +60,7 @@ stage() {
   local d="$1" prefix="$2"
   rm -rf "$d"; mkdir -p "$d/bin" "$d/scripts" "$d/assets" "$d/docs"
   for b in $BINS; do cp "$BIN_SRC/$b" "$d/bin/"; done
-  for s in platform.sh SITLRun.sh HITLRun.sh Python38Env.sh Python38Run.sh FlightGearF450.sh FlightGearDemo.sh run_sitl.sh \
+  for s in platform.sh SITLRun.sh HITLRun.sh APMSITLRun.sh Python38Env.sh Python38Run.sh FlightGearF450.sh FlightGearDemo.sh run_sitl.sh \
            import_rflysim_data.sh CloseALL.sh UdpPortFree.sh ComList.sh; do
     cp "scripts/$s" "$d/scripts/"
   done
@@ -234,7 +234,7 @@ set -eu
 DIR="$(cd "$(dirname "$0")" && pwd)"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"; BIN="$HOME/.local/bin"
 CMDS="coptersim coptersim-ui rflysim3d rflygame rflygame-server rflygame-netem rfly-update"
-WRAP="rfly-sitlrun:SITLRun.sh rfly-hitlrun:HITLRun.sh rfly-python:Python38Env.sh rfly-python-run:Python38Run.sh rfly-flightgear:FlightGearF450.sh rfly-import-data:import_rflysim_data.sh rfly-closeall:CloseALL.sh rfly-udpportfree:UdpPortFree.sh rfly-comlist:ComList.sh"
+WRAP="rfly-sitlrun:SITLRun.sh rfly-hitlrun:HITLRun.sh rfly-apmsitlrun:APMSITLRun.sh rfly-python:Python38Env.sh rfly-python-run:Python38Run.sh rfly-flightgear:FlightGearF450.sh rfly-import-data:import_rflysim_data.sh rfly-closeall:CloseALL.sh rfly-udpportfree:UdpPortFree.sh rfly-comlist:ComList.sh"
 if [ "${1:-}" = --uninstall ]; then
   rm -f "$APPS"/rflytools-*.desktop
   for c in $CMDS; do rm -f "$BIN/$c"; done; for w in $WRAP; do rm -f "$BIN/${w%%:*}"; done

@@ -22,7 +22,12 @@ use widgets::*;
 
 const STATUS_BASE: u16 = 30400;
 const OS: &str = if cfg!(target_os = "macos") { "macOS" } else { "Linux" };
-const SIM_MODES: [&str; 3] = ["PX4_SITL  (PX4 on this computer)", "PX4_HITL  (Pixhawk over USB)", "Simulink / Python  (external controller, UDP 20100)"];
+const SIM_MODES: [&str; 4] = [
+    "PX4_SITL  (PX4 on this computer)",
+    "PX4_HITL  (Pixhawk over USB)",
+    "Simulink / Python  (external controller, UDP 20100)",
+    "APM_SITL  (ArduPilot on this computer)",
+];
 const UDP_MODES: [&str; 7] = ["UDP_Full", "UDP_Simple", "Mavlink_Full", "Mavlink_Simple", "Mavlink_NoSend", "Mavlink_NoGPS", "Mavlink_Vision"];
 
 fn window_conf() -> Conf {
@@ -477,7 +482,7 @@ impl App {
             return;
         }
         let id: u32 = self.vid.trim().parse().unwrap_or(1).max(1);
-        let n: usize = if self.mode == 0 { self.count.trim().parse().unwrap_or(1).clamp(1, 50) } else { 1 };
+        let n: usize = if self.mode == 0 || self.mode == 3 { self.count.trim().parse().unwrap_or(1).clamp(1, 50) } else { 1 };
         let map = rflysim3d::scene::MAP_NAMES[self.map];
         let (x, y, yaw) = (num(&self.px).unwrap_or(0.0), num(&self.py).unwrap_or(0.0), num(&self.yaw).unwrap_or(0.0));
         let scripts = self.root.join("scripts");
@@ -499,6 +504,20 @@ impl App {
             common.push("--fixed-wing".into());
         }
         let cmds = match self.mode {
+            3 => {
+                // ArduPilot SITL: same layout options; ArduPilot has its own MAVLink (no UDP modes).
+                let mut c = Command::new(scripts.join("APMSITLRun.sh"));
+                c.arg(n.to_string())
+                    .args(["--start-index", &id.to_string(), "--map", map, "--yaw", &yaw.to_string()])
+                    .args(["--params-file", &pf.display().to_string(), "--status-port", &STATUS_BASE.to_string()])
+                    .args(["--origin", &x.to_string(), &y.to_string()]);
+                for (on, flag) in [(self.low_gpu, "--low-gpu"), (self.no_3d, "--no-3d"), (self.qgc, "--qgc"), (self.fixed_wing, "--plane")] {
+                    if on {
+                        c.arg(flag);
+                    }
+                }
+                vec![c]
+            }
             0 => {
                 let mut c = Command::new(scripts.join("SITLRun.sh"));
                 c.arg(n.to_string()).args(&common).args(["--origin", &x.to_string(), &y.to_string()]);
@@ -583,7 +602,7 @@ async fn main() {
     let shot_after: f64 = arg("--after").and_then(|v| v.parse().ok()).unwrap_or(3.0);
     let mut auto_started = false;
     if let Some(m) = &auto {
-        app.mode = match m.as_str() { "hitl" => 1, "ext" => 2, _ => 0 };
+        app.mode = match m.as_str() { "hitl" => 1, "ext" => 2, "apm" => 3, _ => 0 };
         app.no_3d = argv.iter().any(|a| a == "--no-3d");
     }
     app.fixed_wing = argv.iter().any(|a| a == "--fixed-wing");
@@ -739,7 +758,7 @@ async fn main() {
         row_label(&ui, "Vehicle ID", sx, sy);
         ui.field(id("vid", 0), Rect::new(sx + 100.0, sy, 60.0, 24.0), &mut app.vid);
         row_label(&ui, "Vehicles", sx + 180.0, sy);
-        if app.mode == 0 {
+        if app.mode == 0 || app.mode == 3 {
             ui.field(id("count", 0), Rect::new(sx + 260.0, sy, 60.0, 24.0), &mut app.count);
         } else {
             text("1", sx + 265.0, sy + 4.0, FS, DIM);

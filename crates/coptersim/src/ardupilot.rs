@@ -82,6 +82,16 @@ pub fn ardupilot_frame_params(frame: Frame) -> Option<(u8, u8)> {
     }
 }
 
+/// ArduPlane settings for the plane model (on top of ArduPilot's SITL `models/plane.parm`, which is
+/// tuned for a faster plane): it cruises at ~15 m/s on ~25 % throttle, as in PX4's airframe 1030.
+pub const PLANE_PARAMS: [(&str, f64); 5] = [
+    ("AIRSPEED_CRUISE", 15.0),
+    ("AIRSPEED_MIN", 10.0),
+    ("AIRSPEED_MAX", 22.0),
+    ("TRIM_THROTTLE", 30.0),
+    ("TKOFF_ALT", 40.0),
+];
+
 /// For each ArduPilot output (servo channel k), the model rotor it drives.
 pub fn motor_map(frame: Frame) -> Result<Vec<usize>, String> {
     let ap = ardupilot_motors(frame).ok_or_else(|| format!("frame {} is not supported with ArduPilot yet", frame.name()))?;

@@ -29,7 +29,7 @@ apt-get update -qq >/dev/null
 chk "apt install .deb" "apt-get install -y -qq /dist/rflytools_${VER}_${ARCH}.deb >/tmp/apt.log 2>&1"
 apt-get install -y -qq xvfb xauth libgl1-mesa-dri >/dev/null 2>&1
 chk "real ALSA (not an OSS stand-in)" "dpkg -l | grep -qE \"^ii  libasound2(t64)?[: ]\""
-for c in coptersim coptersim-ui rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-python rfly-python-run rfly-flightgear rfly-import-data rfly-closeall rfly-udpportfree rfly-comlist; do
+for c in coptersim coptersim-ui rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-apmsitlrun rfly-python rfly-python-run rfly-flightgear rfly-import-data rfly-closeall rfly-udpportfree rfly-comlist; do
   command -v $c >/dev/null || { echo "missing command $c"; ok=0; }
 done
 chk "16 commands on PATH" "true"

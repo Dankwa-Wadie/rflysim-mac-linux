@@ -10,7 +10,7 @@ protocols as Windows RflySim, so PX4 and RflySimSDK-style Python scripts work un
 | ![PX4 offboard flight](docs/media/rflysim3d_px4_sitl.gif) | ![FPV race](docs/media/rflygame_fpv_city.gif) | ![Split screen](docs/media/rflygame_split.gif) |
 
 How it compares with the original Windows RflySim (with a screenshot of the original CopterSim):
-**[docs/COMPARISON.md](docs/COMPARISON.md)**. Full-length videos are in [docs/media](docs/media), e.g. a [PX4 fixed-wing loiter](docs/media/rflysim3d_fixedwing_sitl.mp4).
+**[docs/COMPARISON.md](docs/COMPARISON.md)**. Full-length videos are in [docs/media](docs/media), e.g. a [PX4 fixed-wing loiter](docs/media/rflysim3d_fixedwing_sitl.mp4) and an [ArduPlane flight](docs/media/rflysim3d_arduplane_sitl.mp4).
 
 | RflyTools (Windows) | Replacement here | How to start (after installing) |
 |---|---|---|
@@ -19,6 +19,7 @@ How it compares with the original Windows RflySim (with a screenshot of the orig
 | 3DDisplay | `rflysim3d` | same |
 | SITLRun | `rfly-sitlrun [N] [--qgc]` (`scripts/SITLRun.sh`) | N × (coptersim + PX4 SITL) + RflySim3D |
 | HITLRun | `rfly-hitlrun [PORT…]` (`scripts/HITLRun.sh`) | Pixhawk(s) in HIL mode + RflySim3D |
+| APMSITLRun / APMSITLRun_Plane | `rfly-apmsitlrun [N] [--plane]` (`scripts/APMSITLRun.sh`) | ArduCopter / ArduPlane SITL (a paid feature on Windows) |
 | SITLRunFw / HITLRunFw | `rfly-sitlrun N --fixed-wing`, `rfly-hitlrun --fixed-wing` | PX4 fixed-wing plane (SITL or a Pixhawk in HIL) |
 | Python38Env | `rfly-python [script.py]` (`scripts/Python38Env.sh`) | venv + RflySimSDK port (`PX4MavCtrlV4`, `UE4CtrlAPI`, `VisionCaptureApi`) |
 | FlightGear-F450 | `rfly-flightgear` + `coptersim --fg` | needs FlightGear + FGData |
@@ -89,6 +90,20 @@ git clone --recursive --depth 1 -b v1.17.0 https://github.com/PX4/PX4-Autopilot 
 cd ~/tools/PX4-Autopilot && make px4_sitl_default    # see PX4's docs for its build dependencies
 ```
 
+### ArduPilot SITL (APMSITLRun)
+
+APMSITLRun (`rfly-apmsitlrun [N] [--plane] [--frame quad_x|quad_plus|hexa_x]`) flies ArduCopter or ArduPlane
+on the same physics, through ArduPilot's JSON simulator interface (tested with Copter-4.7.2). It needs an
+ArduPilot SITL build in `~/tools/ardupilot` (or `--ardupilot DIR`, `ARDUPILOT_DIR`):
+
+```sh
+git clone --depth 1 -b Copter-4.7.2 --recurse-submodules --shallow-submodules https://github.com/ArduPilot/ardupilot ~/tools/ardupilot
+pip install empy==3.3.4 pexpect future            # ArduPilot's build needs these (use a venv)
+cd ~/tools/ardupilot && ./waf configure --board sitl && ./waf copter plane
+```
+
+QGroundControl finds the vehicles on UDP 14550; MAVLink is also on TCP 5760 + 10 × instance.
+
 ## Build
 
 ```sh
@@ -144,6 +159,7 @@ scripts/test_all.sh                              # everything below + SITL/Pytho
 cargo test --workspace
 python3 scripts/test_rflysim3d.py                # with rflysim3d running: protocol + image stream
 scripts/test_fixedwing.sh                        # PX4 fixed-wing SITL: takeoff, loiter at 30 m (~1.5 min)
+scripts/test_ardupilot.py both                   # ArduCopter takeoff/hover/land + ArduPlane takeoff/loiter
 scripts/e2e_px4_sitl.sh ~/tools/PX4-Autopilot    # automated takeoff/hover/land with real PX4
 ```
 

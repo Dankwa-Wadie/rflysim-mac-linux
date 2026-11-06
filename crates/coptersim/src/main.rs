@@ -162,7 +162,11 @@ fn main() {
         params.frame = f;
     }
     if args.print_ardupilot_params {
-        if !args.fixed_wing {
+        if args.fixed_wing {
+            for (k, v) in ardupilot::PLANE_PARAMS {
+                println!("{k} {v}");
+            }
+        } else {
             match ardupilot::ardupilot_frame_params(params.frame) {
                 Some((c, t)) => println!("FRAME_CLASS {c}\nFRAME_TYPE {t}"),
                 None => {

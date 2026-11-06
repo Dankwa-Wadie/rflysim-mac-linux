@@ -58,7 +58,8 @@ Legend: ✅ done · 🟡 partly · ❌ missing · ➖ not needed on macOS/Linux 
 | Python38Run | `rfly-python-run` | ✅ | |
 | StopBuild | — | ➖ | |
 | SITLRunUE5 / HITLRunUE5 | — | ➖ | |
-| 💲 SITLPosStrGPS / HITLPosStrGPS, HITLRunPX4Net, HITLRunExtNet, APMSITLRun(_Plane), APMSwitchSITL, Redis modes, SimMode 4–11 | — | ❌ | Paid-edition features on Windows; ArduPilot SITL is the most useful of them |
+| 💲 APMSITLRun / APMSITLRun_Plane (ArduPilot SITL) | `rfly-apmsitlrun [N] [--plane] [--frame F]`, launchers, CopterSim window mode "APM_SITL" | ✅ | ArduPilot's JSON simulator interface on the same physics. ArduCopter (quad X/+, hexa X) and ArduPlane flown (takeoff, hover/loiter, land). Needs an ArduPilot build. Octo/Y6 not yet (ArduPilot's motor order differs) |
+| 💲 SITLPosStrGPS / HITLPosStrGPS, HITLRunPX4Net, HITLRunExtNet, APMSwitchSITL, Redis modes, SimMode 4–11 | — | ❌ | Paid-edition features on Windows |
 
 ## 3. Simulation options (CopterSim)
 
@@ -86,4 +87,4 @@ Legend: ✅ done · 🟡 partly · ❌ missing · ➖ not needed on macOS/Linux 
 4. **RflySim3D**: `-key=`/`-cmd=` options, `RflySim3D.txt`, an `OldFactory`-style map, LowGPU, model styles.
 5. **Pixhawk firmware build/upload** (PX4CMD equivalent).
 6. **More frames** (hexa, octo, tri, Y6), then **fixed wing**. (Done, except tricopter and octo-quad.)
-7. Optional: ArduPilot SITL, MAVROS (Linux), DistSim, cfclient wrapper.
+7. Optional: ArduPilot SITL (done), MAVROS (Linux), DistSim, cfclient wrapper.
