@@ -34,6 +34,10 @@ struct Args {
     /// Print the PX4 parameters (control allocation, HIL outputs) for this vehicle's frame and exit.
     #[arg(long)]
     print_px4_params: bool,
+    /// Fixed-wing aircraft (RflySim SITLRunFw/HITLRunFw): PX4's Gazebo-Classic plane (PX4 airframe 1030,
+    /// PX4_SIM_MODEL=gazebo-classic_plane) instead of a multicopter.
+    #[arg(long)]
+    fixed_wing: bool,
     /// Initial NED position offset (m) and yaw (deg), like CopterSim's initial X/Y/Yaw boxes.
     #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
     init_x: f64,
@@ -149,12 +153,22 @@ fn main() {
         params.frame = f;
     }
     if args.print_px4_params {
+        if args.fixed_wing {
+            for (k, v) in rfly_core::fixedwing::FixedWing::px4_params() {
+                println!("{k} {v}");
+            }
+            return;
+        }
         for (k, v) in params.frame.px4_params(params.arm) {
             println!("{k} {v}");
         }
         return;
     }
-    println!("coptersim: frame {} ({} rotors)", params.frame.label(), params.frame.rotors().len());
+    if args.fixed_wing {
+        println!("coptersim: fixed-wing aircraft (PX4 Gazebo-Classic plane model, 1.5 kg)");
+    } else {
+        println!("coptersim: frame {} ({} rotors)", params.frame.label(), params.frame.rotors().len());
+    }
     println!(
         "coptersim: mass {:.2} kg, arm {:.3} m, hover throttle {:.3}",
         params.mass,
@@ -167,7 +181,7 @@ fn main() {
         None
     } else {
         let windows = if args.no_rfly { 0 } else { args.ue4_windows };
-        match rfly_out::RflyOut::new(args.id, args.vehicle_type.unwrap_or(params.frame.rflysim3d_type()), &args.ue4_ip, windows, home)
+        match rfly_out::RflyOut::new(args.id, args.vehicle_type.unwrap_or(if args.fixed_wing { 100 } else { params.frame.rflysim3d_type() }), &args.ue4_ip, windows, home)
             .and_then(|mut o| {
                 if let Some(fg) = &args.fg {
                     o.fg = Some(fg_out::FgOut::new(fg, home)?);
@@ -196,7 +210,8 @@ fn main() {
     }
     let mut status = args.status_port.and_then(|p| status::StatusOut::new(p, args.id, &params).ok());
     let mut sensors = SensorModel::new(home);
-    let mut vehicle = Vehicle::new(params);
+    let fixed_wing = args.fixed_wing;
+    let mut vehicle = if fixed_wing { Vehicle::new_fixed_wing(rfly_core::fixedwing::FixedWing::px4_plane()) } else { Vehicle::new(params) };
     init(&mut vehicle);
     let mut rfly = rfly;
     // Cached result of the daily update check (no network access here).
@@ -353,10 +368,11 @@ fn main() {
         let (u, armed) = {
             let a = act.lock().unwrap();
             let fresh = a.last.is_some_and(|t| t.elapsed() < timeout);
-            let mut u = [0.0f64; 8];
+            let mut u = [0.0f64; 16];
             if a.armed && fresh {
+                // Multicopter: motor throttles 0..1. Fixed wing: raw outputs (servos -1..1, motor 0..1).
                 for (dst, src) in u.iter_mut().zip(a.controls.iter()) {
-                    *dst = (*src as f64).clamp(0.0, 1.0);
+                    *dst = if fixed_wing { (*src as f64).clamp(-1.0, 1.0) } else { (*src as f64).clamp(0.0, 1.0) };
                 }
             }
             (u, a.armed)
@@ -390,7 +406,7 @@ fn main() {
                 ymag: imu.mag.y as f32,
                 zmag: imu.mag.z as f32,
                 abs_pressure: imu.abs_pressure as f32,
-                diff_pressure: 0.0,
+                diff_pressure: imu.diff_pressure as f32,
                 pressure_alt: imu.pressure_alt as f32,
                 temperature: imu.temperature as f32,
                 fields_updated: HilSensorUpdatedFlags::from_bits_truncate(0x1fff),
@@ -463,6 +479,13 @@ fn main() {
                 r.to_degrees(), p.to_degrees(), y.to_degrees(),
                 u[0], u[1], u[2], u[3],
             );
+            if fixed_wing {
+                let vb = s.att.rotate_inv(s.vel);
+                println!(
+                    "    fw: airspeed {:5.1} m/s  α {:5.1}°  β {:5.1}°  thr {:.2}  ail L/R {:+.2}/{:+.2}  elev {:+.2}  rud {:+.2}",
+                    vb.norm(), vb.z.atan2(vb.x).to_degrees(), (vb.y / vb.norm().max(0.1)).asin().to_degrees(), u[4], u[5], u[6], u[7], u[2]
+                );
+            }
         }
 
         // Real-time pacing.

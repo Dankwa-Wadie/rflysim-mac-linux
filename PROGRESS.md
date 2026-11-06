@@ -555,7 +555,15 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
   run); SITLRun's idle `sleep` delayed its stop trap (now `wait`); PX4 could miss SIGTERM while starting (force
   after 3 s); v1.17 SITL output params are PWM_MAIN_FUNC (not HIL_ACT_FUNC); landed models sank into the pad
   (viewer now stands models on their landing gear); CopterSim status parsing.
-- Not done yet: fixed wing (SITLRunFw), ArduPilot SITL (paid equivalent), RflySim3D.txt config, UE4 scenes
+- **Fixed wing** (SITLRunFw/HITLRunFw): `rfly-core::fixedwing`, a Gazebo LiftDrag-style model of PX4's
+  `gazebo-classic_plane` (wings with ailerons, elevator, rudder, motor, wheels, airspeed sensor). `coptersim
+  --fixed-wing`, `SITLRun --fixed-wing` (PX4 airframe 1030), `HITLRun --fixed-wing`, a "Fixed wing" box in the
+  CopterSim window, SITLRunFw/HITLRunFw launchers, `scripts/test_fixedwing.sh` (takes off and loiters at 30 m,
+  14-15 m/s). PX4 notes: its TECS takes the altitude reference at boot before the GPS origin (altitude 0) and
+  does not reset it, so with a 488 m home the plane sank; fixed-wing runs use home altitude 0 m. A takeoff sent
+  while the EKF is still resetting its origin gets a takeoff waypoint at lat/lon 0,0 and never ends: wait
+  ~15 s after "Ready for takeoff". HITL on a Pixhawk not tested (no board).
+- Not done yet: ArduPilot SITL (paid equivalent), RflySim3D.txt config, UE4 scenes
   (OldFactory), SITLPosAlt, MAVROS (Linux), DistSim, cfclient, model-DLL plug-in, tricopter.
 
 ## Next steps

@@ -44,7 +44,7 @@ Legend: ✅ done · 🟡 partly · ❌ missing · ➖ not needed on macOS/Linux 
 | SITLRunNoUI / HITLRunNoUI | `--no-3d` | ✅ | |
 | SITLRunDebug | `scripts/run_sitl.sh` | ✅ | Name differs |
 | SITLRunChange3D / HITLRunChange3D | `--vehicle-type T` | ✅ | |
-| SITLRunFw / HITLRunFw (fixed wing) | — | ❌ | **No fixed-wing physics** |
+| SITLRunFw / HITLRunFw (fixed wing) | SITLRunFw / HITLRunFw launchers, `--fixed-wing`, CopterSim window "Fixed wing" | ✅ | Model of PX4's Gazebo plane (aero surfaces, motor, wheels, airspeed). SITL flown (takeoff, loiter); HITL not tested on a board yet |
 | SITLRunLANSwarm / HITLRunLANSwarm (`IS_BROADCAST=1`) | `--broadcast 1` or IP list | ✅ | |
 | SITLRunROS / HITLRunROS (MAVROS) | — | ❌ | ROS is rare on macOS; doable on Linux |
 | SITLRunMAVLinkNoGPS / HITLRunMAVLinkNoGPS | `--udp-mode Mavlink_NoGPS` | ✅ | |
@@ -69,6 +69,7 @@ Legend: ✅ done · 🟡 partly · ❌ missing · ➖ not needed on macOS/Linux 
 | SimMode 3 Simulink&DLL_SIL | `--ext` lockstep port | 🟡 (different mechanism, same purpose) |
 | UDPSIMMODE 0 UDP_Full | yes (RflySim3D + true-data outputs) | ✅ |
 | UDPSIMMODE 1 UDP_Simple, 2 Mavlink_Full, 3 Mavlink_Simple, 4 Mavlink_NoSend, 5 Mavlink_NoGPS, 6 Mavlink_Vision | `--udp-mode` (all) | ✅ (UDP_Full/Simple bridge wire-compatible with RflySimSDK; all flown in PX4 SITL) |
+| Fixed-wing aircraft (vehicle type 100) | `--fixed-wing` | ✅ |
 | Frames: quad, hexa, octo, octo-quad, tri, Y6 | quad X/+, hexa X, octo X, Y6 | 🟡 (tricopter needs a tail servo: not modelled; octo-quad (coaxial X8) missing) |
 | Model-DLL plug-in | — | ❌ |
 | Broadcast (`IS_BROADCAST`) | `--broadcast` / coptersim `--ue4-ip` | ✅ |
@@ -84,5 +85,5 @@ Legend: ✅ done · 🟡 partly · ❌ missing · ➖ not needed on macOS/Linux 
 3. **UDPSIMMODE** 1–6 and broadcast (LAN swarm).
 4. **RflySim3D**: `-key=`/`-cmd=` options, `RflySim3D.txt`, an `OldFactory`-style map, LowGPU, model styles.
 5. **Pixhawk firmware build/upload** (PX4CMD equivalent).
-6. **More frames** (hexa, octo, tri, Y6), then **fixed wing**.
+6. **More frames** (hexa, octo, tri, Y6), then **fixed wing**. (Done, except tricopter and octo-quad.)
 7. Optional: ArduPilot SITL, MAVROS (Linux), DistSim, cfclient wrapper.

@@ -31,16 +31,36 @@ pub struct Vehicle {
     pub ext_torque: Vec3,
     /// Built-in flat-ground contact (rest on z = 0). Disable when the caller models contacts.
     pub builtin_ground: bool,
+    /// Fixed-wing aircraft: when set, `step` uses its aerodynamics instead of the multicopter model and
+    /// takes raw actuator commands (servos −1..1, motor 0..1, PX4 output order).
+    pub fw: Option<crate::fixedwing::FixedWing>,
 }
 
 impl Vehicle {
     pub fn new(p: Params) -> Self {
         let s = State { on_ground: true, ..Default::default() };
-        Self { p, s, ext_force: Vec3::ZERO, ext_torque: Vec3::ZERO, builtin_ground: true }
+        Self { p, s, ext_force: Vec3::ZERO, ext_torque: Vec3::ZERO, builtin_ground: true, fw: None }
+    }
+
+    /// A fixed-wing aircraft resting on the ground at the origin.
+    pub fn new_fixed_wing(fw: crate::fixedwing::FixedWing) -> Self {
+        let mut p = Params::default();
+        p.mass = fw.mass;
+        let mut v = Self::new(p);
+        v.s.pos.z = -fw.rest_height();
+        v.fw = Some(fw);
+        v
     }
 
     /// Advance by `dt` seconds with throttles `u` (0..1, PX4 motor order).
     pub fn step(&mut self, u: &[f64], dt: f64) {
+        if let Some(fw) = &self.fw {
+            let s = &mut self.s;
+            let mut w = s.motor_w[0];
+            s.on_ground = crate::fixedwing::step(fw, &mut s.pos, &mut s.vel, &mut s.att, &mut s.rate, &mut w, &mut s.acc, u, self.p.g, dt);
+            s.motor_w[0] = w;
+            return;
+        }
         let p = &self.p;
         let s = &mut self.s;
         let rotors = p.frame.rotors();

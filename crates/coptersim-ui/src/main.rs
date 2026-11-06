@@ -260,6 +260,8 @@ struct App {
     fg: bool,
     low_gpu: bool,
     no_3d: bool,
+    /// Fly PX4's fixed-wing plane instead of the configured multicopter (Windows SITLRunFw/HITLRunFw).
+    fixed_wing: bool,
     live_sel: usize,
     run: Option<Run>,
     log: Arc<Mutex<VecDeque<String>>>,
@@ -313,6 +315,7 @@ impl App {
             fg: false,
             low_gpu: false,
             no_3d: false,
+            fixed_wing: false,
             live_sel: 0,
             run: None,
             log: Arc::new(Mutex::new(VecDeque::new())),
@@ -492,6 +495,9 @@ impl App {
         if self.qgc {
             common.push("--qgc".into());
         }
+        if self.fixed_wing {
+            common.push("--fixed-wing".into());
+        }
         let cmds = match self.mode {
             0 => {
                 let mut c = Command::new(scripts.join("SITLRun.sh"));
@@ -520,6 +526,9 @@ impl App {
                     .arg(format!("--init-yaw={yaw}"));
                 if self.fg {
                     sim.arg("--fg");
+                }
+                if self.fixed_wing {
+                    sim.args(["--fixed-wing", "--alt=0"]);
                 }
                 let mut v = vec![sim];
                 if !self.no_3d {
@@ -577,6 +586,7 @@ async fn main() {
         app.mode = match m.as_str() { "hitl" => 1, "ext" => 2, _ => 0 };
         app.no_3d = argv.iter().any(|a| a == "--no-3d");
     }
+    app.fixed_wing = argv.iter().any(|a| a == "--fixed-wing");
     let maps: Vec<String> = rflysim3d::scene::MAP_NAMES.iter().map(|s| s.to_string()).collect();
     loop {
         clear_background(BG);
@@ -738,7 +748,8 @@ async fn main() {
         ui.dropdown(id("udp", 0), Rect::new(sx + 430.0, sy, 180.0, 24.0), &UDP_MODES.iter().map(|s| s.to_string()).collect::<Vec<_>>(), &mut app.udp);
         let sy2 = sy + ROW + 8.0;
         row_label(&ui, "Simulation Mode", sx, sy2);
-        ui.dropdown(id("mode", 0), Rect::new(sx + 150.0, sy2, 460.0, 24.0), &SIM_MODES.iter().map(|s| s.to_string()).collect::<Vec<_>>(), &mut app.mode);
+        ui.dropdown(id("mode", 0), Rect::new(sx + 150.0, sy2, 330.0, 24.0), &SIM_MODES.iter().map(|s| s.to_string()).collect::<Vec<_>>(), &mut app.mode);
+        ui.checkbox("Fixed wing", sx + 500.0, sy2, &mut app.fixed_wing);
         let sy3 = sy2 + ROW + 8.0;
         row_label(&ui, "3D Scene", sx, sy3);
         ui.dropdown(id("map", 0), Rect::new(sx + 150.0, sy3, 200.0, 24.0), &maps, &mut app.map);

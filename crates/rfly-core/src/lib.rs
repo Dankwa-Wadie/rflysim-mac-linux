@@ -1,6 +1,7 @@
 //! rfly-core: dependency-free multicopter simulation core for the RflySim macOS port.
 
 pub mod dynamics;
+pub mod fixedwing;
 pub mod math;
 pub mod params;
 pub mod sensors;

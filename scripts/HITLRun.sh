@@ -13,6 +13,8 @@
 #   --start-index I       first CopterID (START_INDEX); vehicles follow the port order
 #   --sysid               CopterID = each Pixhawk's MAV_SYS_ID (HITLRunSysID)
 #   --origin X Y, --yaw DEG, --interval M, --pos-x/--pos-y/--yaw-list LISTS   start positions (as SITLRun)
+#   --fixed-wing          fixed-wing aircraft (HITLRunFw). The Pixhawk needs a fixed-wing airframe with
+#                         SYS_HITL 1 and the output mapping printed by: coptersim --print-px4-params --fixed-wing
 #   --map NAME, --no-3d, --low-gpu, --qgc, --params-file FILE, --status-port P, --udp-mode M   (as SITLRun)
 #   Linux: your user must be in the serial group (sudo usermod -aG dialout $USER, then log in again)
 #   and ModemManager must not grab the port (sudo systemctl stop ModemManager).
@@ -20,7 +22,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/platform.sh"
 MAP="Grasslands"; BAUD=921600; PORTS=(); AUTO=0; START=1; SYSID=0; NO3D=0; LOWGPU=0; QGC=0
-SPACING=2; OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""; UDPMODE=2
+SPACING=2; OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""; UDPMODE=2; FW=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --map) MAP="$2"; shift ;;
@@ -31,6 +33,7 @@ while [ $# -gt 0 ]; do
     --no-3d) NO3D=1 ;;
     --low-gpu) LOWGPU=1 ;;
     --qgc) QGC=1 ;;
+    --fixed-wing) FW=1 ;;
     --spacing|--interval) SPACING="$2"; shift ;;
     --origin) OX="$2"; OY="$3"; shift 2 ;;
     --yaw) YAW="$2"; shift ;;
@@ -113,6 +116,7 @@ for p in "${PORTS[@]}"; do
   [ -n "$PY" ] && [ -n "$(nth "$PY" $((k + 1)))" ] && Y="$(nth "$PY" $((k + 1)))"
   [ -n "$PYAW" ] && [ -n "$(nth "$PYAW" $((k + 1)))" ] && VYAW="$(nth "$PYAW" $((k + 1)))"
   EXTRA=(--udp-mode "$UDPMODE"); [ -n "$PARAMS" ] && EXTRA+=(--params-file "$PARAMS"); [ -n "$STATUS" ] && EXTRA+=(--status-port $((STATUS + k)))
+  [ "$FW" = 1 ] && EXTRA+=(--fixed-wing --alt=0)   # home at 0 m: see SITLRun (PX4 TECS boot reference)
   "$SIM" --id "$i" --link "serial:$p:$BAUD" ${DBARG[@]+"${DBARG[@]}"} --init-x="$X" --init-y="$Y" --init-yaw="$VYAW" \
       ${EXTRA[@]+"${EXTRA[@]}"} >"$LOG/coptersim_$i.log" 2>&1 &
   PIDS+=("$!")

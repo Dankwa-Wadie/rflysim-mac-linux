@@ -10,7 +10,7 @@ protocols as Windows RflySim, so PX4 and RflySimSDK-style Python scripts work un
 | ![PX4 offboard flight](docs/media/rflysim3d_px4_sitl.gif) | ![FPV race](docs/media/rflygame_fpv_city.gif) | ![Split screen](docs/media/rflygame_split.gif) |
 
 How it compares with the original Windows RflySim (with a screenshot of the original CopterSim):
-**[docs/COMPARISON.md](docs/COMPARISON.md)**. Full-length videos are in [docs/media](docs/media).
+**[docs/COMPARISON.md](docs/COMPARISON.md)**. Full-length videos are in [docs/media](docs/media), e.g. a [PX4 fixed-wing loiter](docs/media/rflysim3d_fixedwing_sitl.mp4).
 
 | RflyTools (Windows) | Replacement here | How to start (after installing) |
 |---|---|---|
@@ -19,6 +19,7 @@ How it compares with the original Windows RflySim (with a screenshot of the orig
 | 3DDisplay | `rflysim3d` | same |
 | SITLRun | `rfly-sitlrun [N] [--qgc]` (`scripts/SITLRun.sh`) | N × (coptersim + PX4 SITL) + RflySim3D |
 | HITLRun | `rfly-hitlrun [PORT…]` (`scripts/HITLRun.sh`) | Pixhawk(s) in HIL mode + RflySim3D |
+| SITLRunFw / HITLRunFw | `rfly-sitlrun N --fixed-wing`, `rfly-hitlrun --fixed-wing` | PX4 fixed-wing plane (SITL or a Pixhawk in HIL) |
 | Python38Env | `rfly-python [script.py]` (`scripts/Python38Env.sh`) | venv + RflySimSDK port (`PX4MavCtrlV4`, `UE4CtrlAPI`, `VisionCaptureApi`) |
 | FlightGear-F450 | `rfly-flightgear` + `coptersim --fg` | needs FlightGear + FGData |
 | (game) | **RflyGame**: FPV racing, missions, flight school, multiplayer, garage. See [docs/RFLYGAME.md](docs/RFLYGAME.md) | `rflygame`, or the RflyGame app |
@@ -129,6 +130,7 @@ including PX4 SITL (built once for Linux from `~/tools/PX4-Autopilot`). Use it t
 
 ```sh
 scripts/SITLRun.sh 1 --qgc                                     # sim + PX4 + RflySim3D + QGC
+scripts/SITLRun.sh 1 --qgc --fixed-wing                        # the same with PX4's fixed-wing plane
 scripts/Python38Env.sh python/examples/offboard_camera.py      # RflySimSDK-style experiment
 ```
 
@@ -141,6 +143,7 @@ M map · T trails · L labels · P crash detection · H help.
 scripts/test_all.sh                              # everything below + SITL/Python/bdsim/apps (~4 min)
 cargo test --workspace
 python3 scripts/test_rflysim3d.py                # with rflysim3d running: protocol + image stream
+scripts/test_fixedwing.sh                        # PX4 fixed-wing SITL: takeoff, loiter at 30 m (~1.5 min)
 scripts/e2e_px4_sitl.sh ~/tools/PX4-Autopilot    # automated takeoff/hover/land with real PX4
 ```
 

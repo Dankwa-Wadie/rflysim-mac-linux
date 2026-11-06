@@ -34,6 +34,8 @@ pub struct Imu {
     pub abs_pressure: f64,
     pub pressure_alt: f64,
     pub temperature: f64,
+    /// Pitot differential pressure (hPa) from the forward airspeed (fixed-wing airspeed sensor).
+    pub diff_pressure: f64,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -90,6 +92,10 @@ impl SensorModel {
             abs_pressure: p_pa / 100.0 + baro_noise,
             pressure_alt: alt,
             temperature: 15.0 - 0.0065 * alt,
+            diff_pressure: {
+                let u = v.s.att.rotate_inv(v.s.vel).x.max(0.0);
+                0.5 * 1.225 * u * u / 100.0 + self.noise.gauss(0.002).abs()
+            },
         }
     }
 

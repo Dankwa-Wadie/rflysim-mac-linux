@@ -129,7 +129,10 @@ app "SITLRun"             SITLRun         term "$ASK_N
 \"\$ROOT/scripts/SITLRun.sh\" \"\$N\" --qgc"
 app "SITLRunLowGPU"       SITLRun         term "$ASK_N
 \"\$ROOT/scripts/SITLRun.sh\" \"\$N\" --qgc --low-gpu"
+app "SITLRunFw"           SITLRun         term "$ASK_N
+\"\$ROOT/scripts/SITLRun.sh\" \"\$N\" --qgc --fixed-wing"
 app "HITLRun"             HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc'
+app "HITLRunFw"           HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc --fixed-wing'
 app "HITLRunLowGPU"       HITLRun         term '"$ROOT/scripts/HITLRun.sh" --qgc --low-gpu'
 app "CloseALL"            CloseALL        term '"$ROOT/scripts/CloseALL.sh"'
 app "Python38Env"         Python38Env     term '"$ROOT/scripts/Python38Env.sh"'

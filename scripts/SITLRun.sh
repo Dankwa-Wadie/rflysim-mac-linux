@@ -24,6 +24,8 @@
 #                                                  8 octo, 100 plane, 30 car, 150 box
 #   (SITLPos)             --ask-pos                ask for the PosX / PosY / yaw lists when starting
 #   (frame type)          --frame F                quad_x (default), quad_plus, hexa_x, octo_x, y6 (or set in --params-file)
+#   (SITLRunFw)           --fixed-wing             fixed-wing aircraft (PX4 plane airframe 1030; take off with
+#                                                  QGC or `commander takeoff`: runway take-off, then loiter)
 #                         --params-file FILE       vehicle parameters (from the CopterSim window)
 #                         --status-port P          10 Hz status of each vehicle to UDP P+i-1 (CopterSim window)
 #                         --px4 DIR                PX4-Autopilot checkout (default ~/tools/PX4-Autopilot)
@@ -36,7 +38,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/platform.sh"
 N=""; MAP="Grasslands"; NO3D=0; LOWGPU=0; QGC=0; FG=0; SPACING=2; START=1; MAX=50
-OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""; UDPMODE=2; BCAST=""; VTYPE=""; ASKPOS=0; FRAME=""
+OX=0; OY=0; YAW=0; PX=""; PY=""; PYAW=""; PARAMS=""; STATUS=""; UDPMODE=2; BCAST=""; VTYPE=""; ASKPOS=0; FRAME=""; FW=0
 PX4_DIR="${PX4_DIR:-$HOME/tools/PX4-Autopilot}"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -60,8 +62,9 @@ while [ $# -gt 0 ]; do
     --vehicle-type) VTYPE="$2"; shift ;;
     --ask-pos) ASKPOS=1 ;;
     --frame) FRAME="$2"; shift ;;
+    --fixed-wing) FW=1 ;;
     --px4) PX4_DIR="$2"; shift ;;
-    -h|--help) sed -n 2,36p "$0"; exit 0 ;;
+    -h|--help) sed -n 2,38p "$0"; exit 0 ;;
     -*) echo "SITLRun: unknown option $1 (see --help)"; exit 1 ;;
     *) N="$1" ;;
   esac
@@ -138,13 +141,21 @@ for k in $(seq 0 $((N - 1))); do
   EXTRA+=(--udp-mode "$UDPMODE")
   [ -n "$VTYPE" ] && EXTRA+=(--vehicle-type "$VTYPE")
   [ -n "$FRAME" ] && EXTRA+=(--frame "$FRAME")
+  # Fixed wing: home at 0 m AMSL unless SIM_ARGS gives --alt. PX4's TECS takes its altitude
+  # reference at boot, before the EKF has a GPS origin (altitude 0), and does not reset it when the
+  # origin arrives, so with a high home it climbs its setpoint at 3 m/s from 0 and the plane sinks.
+  if [ "$FW" = 1 ]; then
+    EXTRA+=(--fixed-wing)
+    case " ${SIM_ARGS:-} " in *" --alt"*) ;; *) EXTRA+=(--alt=0) ;; esac
+  fi
   [ -n "$BCAST" ] && [ "$BCAST" != 0 ] && EXTRA+=(--ue4-ip "127.0.0.1,$BCAST")
   # UDP_Full/UDP_Simple: coptersim serves Python's ports and talks to PX4 over its own MAVLink link.
   [ "$UDPMODE" -le 1 ] && EXTRA+=(--px4-mav "udpin:0.0.0.0:$((25100 + 2 * inst))")
   "$SIM" --id "$i" ${DBARG[@]+"${DBARG[@]}"} --init-x="$X" --init-y="$Y" --init-yaw="$VYAW" ${EXTRA[@]+"${EXTRA[@]}"} ${SIM_ARGS:-} >"$LOG/coptersim_$i.log" 2>&1 &
   PIDS+=("$!")
   mkdir -p "$PX4_BUILD/instance_$inst"
-  PX4_SIM_MODEL=none_iris "$PX4_BUILD/bin/px4" -i "$inst" -d -w "$PX4_BUILD/instance_$inst" "$PX4_BUILD/etc" >"$LOG/px4_$i.log" 2>&1 &
+  MODEL=none_iris; [ "$FW" = 1 ] && MODEL=gazebo-classic_plane
+  PX4_SIM_MODEL=$MODEL "$PX4_BUILD/bin/px4" -i "$inst" -d -w "$PX4_BUILD/instance_$inst" "$PX4_BUILD/etc" >"$LOG/px4_$i.log" 2>&1 &
   PIDS+=("$!")
   echo "SITLRun: vehicle #$i at x=$X y=$Y yaw=$VYAW"
 done
@@ -166,12 +177,14 @@ for k in $(seq 0 $((N - 1))); do
   # Mavlink_NoGPS / Mavlink_Vision: no GPS; Vision fuses coptersim's external-vision odometry instead.
   setp() { (cd "$PX4_BUILD" && ./bin/px4-param --instance "$inst" set "$1" "$2") >>"$LOG/px4_$i.log" 2>&1; }
   # Frame geometry for PX4's control allocation, from coptersim (every run: PX4 keeps parameters).
-  FA=(); [ -n "$PARAMS" ] && FA+=(--params-file "$PARAMS"); [ -n "$FRAME" ] && FA+=(--frame "$FRAME")
+  FA=(); [ -n "$PARAMS" ] && FA+=(--params-file "$PARAMS"); [ -n "$FRAME" ] && FA+=(--frame "$FRAME"); [ "$FW" = 1 ] && FA+=(--fixed-wing)
   "$SIM" --print-px4-params ${FA[@]+"${FA[@]}"} 2>/dev/null | grep -E "^[A-Z][A-Z0-9_]+ " | while read -r pn pv; do setp "$pn" "$pv"; done
   # PX4 keeps parameters per instance, so every mode sets (or resets) all of these.
   (cd "$PX4_BUILD" && ./bin/px4-param --instance "$inst" reset COM_ARM_WO_GPS EKF2_GPS_CTRL EKF2_EV_CTRL EKF2_HGT_REF) >>"$LOG/px4_$i.log" 2>&1
   if [ "$UDPMODE" = 5 ] || [ "$UDPMODE" = 6 ]; then setp COM_ARM_WO_GPS 1; setp EKF2_GPS_CTRL 0; fi
   if [ "$UDPMODE" = 6 ]; then setp EKF2_EV_CTRL 15; setp EKF2_HGT_REF 3; fi
+  # The plane airframe needs a ground station link to arm (NAV_DLL_ACT 2); in simulation, as RflySimSDK does, no.
+  [ "$FW" = 1 ] && setp NAV_DLL_ACT 0
   echo "SITLRun: vehicle #$i ready (PX4 instance $inst, Python port $((20100 + 2 * inst))/$((20101 + 2 * inst)), mode $UDPMODE)"
 done
 
