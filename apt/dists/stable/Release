@@ -1,0 +1,28 @@
+Architectures: amd64 arm64
+Codename: stable
+Components: main
+Date: Fri, 06 Nov 2026 11:59:21 +0000
+Description: RflySim tools for Linux (github.com/Dankwa-Wadie/rflysim-mac-linux)
+Label: RflyTools
+Origin: RflyTools
+Suite: stable
+MD5Sum:
+ 398948fb9d569c477938eafb8092806a             1210 main/binary-amd64/Packages
+ 309ac0caa284f38b8b555f07727b29c1              794 main/binary-amd64/Packages.gz
+ 36fe74df05cc71948ce0e10bb3be5530             1210 main/binary-arm64/Packages
+ 55a956fe74bc55017b6d207043fc28d9              795 main/binary-arm64/Packages.gz
+SHA1:
+ 785eb05e6e604f224bf2a68effc06f3154b61051             1210 main/binary-amd64/Packages
+ 5b9588428b5cc1f8b26316b1b7f1107d5030548a              794 main/binary-amd64/Packages.gz
+ 185278eeacc89160debf19de9d56c72639284050             1210 main/binary-arm64/Packages
+ 523690b58412ae554cfe569ca9a8fb120dcaa7db              795 main/binary-arm64/Packages.gz
+SHA256:
+ 36ee4d049995870f8b7950e4d0e92c56eb47dad22fff78ff656e50b967fd11ac             1210 main/binary-amd64/Packages
+ 440519ac2a67f3d3b5c7a68cd24f7ed8e4fb9414c004ca50dff3bc672a32523d              794 main/binary-amd64/Packages.gz
+ 8f850f6a2e3d180bf3ec7cfdfe65ce6651c4f8da60c5af1425c8b98367f98252             1210 main/binary-arm64/Packages
+ bf4d9a9b520fc062dffecec07a7729eb40117516d809b1defcafedb5b5b8eb2a              795 main/binary-arm64/Packages.gz
+SHA512:
+ c3b5891c044fb94d0f47e22dc157266243639f3f484f995c4b1ff2c9231ec4b58e415a44cf1bfb57a11af46e142f16195fe36b943f9d14d47cbbe3b83344e918             1210 main/binary-amd64/Packages
+ f54b7649e7d2bac3def3864393487cd01d46e1691cc2b38ab24398c1c93df55d9b349c56d18dfe97fbc0699b6ecc470b5521e22dea01a6a4d1fe46fb2b6ebf8e              794 main/binary-amd64/Packages.gz
+ 4bce2fab284a04aec92f38f312676570c17ba991b91ff19e9049f4c43ce005f16aed744a0d38ab94f3b8c7466313a1468a263585549264b5bb74fac2162908e8             1210 main/binary-arm64/Packages
+ df9b03b4b426d8a6e54c218ca69bd0447d6e430d2166e447125d858f6596f03705b3ffa37979f25d5fd20412a8bc0bce83ef50a9baaba288036082172e60d7b8              795 main/binary-arm64/Packages.gz

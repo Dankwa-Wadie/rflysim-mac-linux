@@ -1,0 +1,23 @@
+Package: rflytools
+Architecture: arm64
+Version: 0.2.0
+Priority: optional
+Section: science
+Maintainer: Dankwa-Wadie <187449218+Dankwa-Wadie@users.noreply.github.com>
+Installed-Size: 16636
+Depends: libc6 (>= 2.34), libasound2t64 | libasound2 (>= 1.1), libudev1, libgl1, libx11-6, libxi6, libxkbcommon0, python3, python3-venv, libarchive-tools, curl
+Recommends: x-terminal-emulator
+Suggests: flightgear
+Filename: pool/main/r/rflytools/rflytools_0.2.0_arm64.deb
+Size: 3526054
+MD5sum: abe257fd03dd1af360035937c26a3ca7
+SHA1: 9d7f7354d6d05bdacff96e47c8b0daa2fe485fd3
+SHA256: 4d2388d628f5e17f9d9d7b95a707e816f5364669336bf6841e633eab6177e399
+SHA512: 88904d0fa346c1547c9674d25c06c6b04dbe5746a95a6637329040b7f5236f6c88ff8c5b063cdd1031e551762c8a1fb967d63039066ceacaa3ff2e1fcf84d928
+Homepage: https://github.com/Dankwa-Wadie/rflysim-mac-linux
+Description: RflySim's tools for Linux and macOS (MATLAB-free)
+ CopterSim-compatible simulator for PX4 SITL/HIL, RflySim3D-compatible 3D viewer,
+ RflyGame (FPV drone game), SITLRun/HITLRun, Python38Env with a RflySimSDK port,
+ FlightGear-F450 output and the RflyMac Simulink package. RflySim's own data files
+ are imported from the user's RflySim ISO with "Import RflySim Data".
+

@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><title>RflyTools packages</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:46em;margin:3em auto;padding:0 1em}code,pre{background:#f3f3f3;padding:.1em .3em}</style>
+<h1>RflyTools APT repository</h1>
+<p>RflySim's tools for Linux: <a href="https://github.com/Dankwa-Wadie/rflysim-mac-linux">github.com/Dankwa-Wadie/rflysim-mac-linux</a>.
+Installing a <code>.deb</code> from the Releases page sets this repository up automatically, so updates arrive with
+<code>sudo apt upgrade</code>. To add it by hand (Debian 12+, Ubuntu 22.04+):</p>
+<pre>sudo curl -fsSLo /usr/share/keyrings/rflytools-archive-keyring.gpg \
+  https://dankwa-wadie.github.io/rflysim-mac-linux/apt/rflytools-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/rflytools-archive-keyring.gpg] https://dankwa-wadie.github.io/rflysim-mac-linux/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/rflytools.list
+sudo apt update && sudo apt install rflytools</pre>
