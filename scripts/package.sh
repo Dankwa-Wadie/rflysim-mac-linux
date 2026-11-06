@@ -106,8 +106,26 @@ for a in /Applications/RflyTools/*.app; do touch "$a"; done
 exit 0
 EOF
   chmod 755 "$P/scripts/postinstall"
-  pkgbuild --root "$PAY" --scripts "$P/scripts" --identifier org.rflysim-mac.rflytools --version "$VER" \
-    --install-location / "$P/rflytools.pkg" >/dev/null
+  # No extended attributes in the payload (they become ._* AppleDouble files on the target).
+  xattr -cr "$PAY"
+  # Apps must land in /Applications/RflyTools. By default the Installer "relocates" a bundle to wherever an
+  # app with the same bundle ID already is (e.g. a development copy), so mark every bundle non-relocatable.
+  pkgbuild --analyze --root "$PAY" "$P/components.plist" >/dev/null
+  /usr/bin/python3 - "$P/components.plist" <<'PY'
+import plistlib, sys
+path = sys.argv[1]
+items = plistlib.load(open(path, "rb"))
+def fix(b):
+    b["BundleIsRelocatable"] = False
+    for c in b.get("ChildBundles", []):
+        fix(c)
+for b in items:
+    fix(b)
+plistlib.dump(items, open(path, "wb"))
+print(f"{len(items)} app bundles marked non-relocatable")
+PY
+  COPYFILE_DISABLE=1 pkgbuild --root "$PAY" --component-plist "$P/components.plist" --scripts "$P/scripts" \
+    --identifier org.rflysim-mac.rflytools --version "$VER" --install-location / "$P/rflytools.pkg" >/dev/null
   mkdir -p "$P/res"
   cat >"$P/res/welcome.html" <<EOF
 <html><body style="font-family:-apple-system,Helvetica;font-size:13px">

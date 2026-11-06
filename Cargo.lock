@@ -209,7 +209,7 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "coptersim"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "mavlink",
@@ -929,11 +929,11 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rfly-core"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "rfly-db"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rfly-core",
  "rusqlite",
@@ -941,11 +941,11 @@ dependencies = [
 
 [[package]]
 name = "rfly-proto"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "rflygame"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gilrs",
  "macroquad",
@@ -957,7 +957,7 @@ dependencies = [
 
 [[package]]
 name = "rflysim3d"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "image 0.25.10",
  "macroquad",
