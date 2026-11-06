@@ -727,6 +727,12 @@ mod tests {
     /// race on a synchronised countdown, and see each other's drone move smoothly.
     #[test]
     fn internet_conditions() {
+        // Real-time test (wall-clock pacing, 10 ms frames, proxies with jitter). Shared CI machines starve
+        // threads for 50+ ms, which breaks the timing it measures, so it runs locally and in test_all.sh only.
+        if std::env::var_os("CI").is_some() {
+            eprintln!("skipped on CI: real-time netcode test needs an unloaded machine");
+            return;
+        }
         let stop = Arc::new(AtomicBool::new(false));
         let port = spawn_server(ServerConfig { port: 0, name: "net".into(), lan_beacon: false }, stop.clone()).unwrap();
         let up: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
