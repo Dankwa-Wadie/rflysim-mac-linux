@@ -563,7 +563,13 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
   does not reset it, so with a 488 m home the plane sank; fixed-wing runs use home altitude 0 m. A takeoff sent
   while the EKF is still resetting its origin gets a takeoff waypoint at lat/lon 0,0 and never ends: wait
   ~15 s after "Ready for takeoff". HITL on a Pixhawk not tested (no board).
-- Not done yet: ArduPilot SITL (paid equivalent), RflySim3D.txt config, UE4 scenes
+- **ArduPilot SITL** (Windows APMSITLRun / APMSITLRun_Plane, paid there): in progress. `coptersim --ardupilot
+  [PORT]` serves ArduPilot's JSON physics interface (lockstep servo packets in, IMU/pose JSON out); copter
+  motors mapped by arm angle and spin (quad X/+, hexa X; ArduPilot's octo X spins the other way, Y6 numbering
+  differs), plane surfaces from ArduPlane's default channels. `scripts/APMSITLRun.sh [N] [--plane]` starts
+  coptersim + arducopter/arduplane + RflySim3D, QGC on UDP 14550. Unit-tested; not flown yet (needs an
+  ArduPilot build in ~/tools/ardupilot).
+- Not done yet: ArduPilot SITL flight test (paid equivalent), RflySim3D.txt config, UE4 scenes
   (OldFactory), SITLPosAlt, MAVROS (Linux), DistSim, cfclient, model-DLL plug-in, tricopter.
 
 ## Next steps

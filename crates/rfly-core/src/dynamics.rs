@@ -22,6 +22,7 @@ pub struct State {
     pub on_ground: bool,
 }
 
+#[derive(Clone)]
 pub struct Vehicle {
     pub p: Params,
     pub s: State,

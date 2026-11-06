@@ -34,6 +34,9 @@ struct Args {
     /// Print the PX4 parameters (control allocation, HIL outputs) for this vehicle's frame and exit.
     #[arg(long)]
     print_px4_params: bool,
+    /// Print the ArduPilot parameters (FRAME_CLASS, FRAME_TYPE) for this vehicle's frame and exit.
+    #[arg(long)]
+    print_ardupilot_params: bool,
     /// Fixed-wing aircraft (RflySim SITLRunFw/HITLRunFw): PX4's Gazebo-Classic plane (PX4 airframe 1030,
     /// PX4_SIM_MODEL=gazebo-classic_plane) instead of a multicopter.
     #[arg(long)]
@@ -87,6 +90,11 @@ struct Args {
     /// instead of PX4. RflySim's CopterSim used 20100 as its SIL port.
     #[arg(long, value_name = "PORT", num_args = 0..=1, default_missing_value = "20100")]
     ext: Option<u16>,
+    /// ArduPilot SITL instead of PX4: serve ArduPilot's JSON physics interface on this UDP port
+    /// (ArduPilot started with `--model JSON`; 9002 + 10 × instance). Copter (quad X/+, hexa X) or,
+    /// with --fixed-wing, ArduPlane.
+    #[arg(long, value_name = "PORT", num_args = 0..=1, default_missing_value = "9002")]
+    ardupilot: Option<u16>,
     /// Vehicle parameters from a file (written by the CopterSim window's configurator; `name = value`
     /// lines, the 14 ModelData.db modelInfo values). Takes precedence over --db/--params.
     #[arg(long, value_name = "FILE")]
@@ -124,6 +132,7 @@ fn simple_mode_msg(m: &MavMessage) -> bool {
     )
 }
 
+mod ardupilot;
 mod ext;
 mod fg_out;
 mod rfly_out;
@@ -151,6 +160,18 @@ fn main() {
     let mut params = load_params(&args);
     if let Some(f) = args.frame {
         params.frame = f;
+    }
+    if args.print_ardupilot_params {
+        if !args.fixed_wing {
+            match ardupilot::ardupilot_frame_params(params.frame) {
+                Some((c, t)) => println!("FRAME_CLASS {c}\nFRAME_TYPE {t}"),
+                None => {
+                    eprintln!("coptersim: frame {} is not supported with ArduPilot yet", params.frame.name());
+                    std::process::exit(2);
+                }
+            }
+        }
+        return;
     }
     if args.print_px4_params {
         if args.fixed_wing {
@@ -204,6 +225,23 @@ fn main() {
         let status = args.status_port.and_then(|p| status::StatusOut::new(p, args.id, &params).ok());
         if let Err(e) = ext::run(port, params, home, rfly, status, &init) {
             eprintln!("coptersim: external mode failed: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    if let Some(port) = args.ardupilot {
+        let status = args.status_port.and_then(|p| status::StatusOut::new(p, args.id, &params).ok());
+        let mixer = ardupilot::mixer_for(&params, args.fixed_wing).unwrap_or_else(|e| {
+            eprintln!("coptersim: {e}");
+            std::process::exit(2);
+        });
+        let vehicle = if args.fixed_wing {
+            Vehicle::new_fixed_wing(rfly_core::fixedwing::FixedWing::px4_plane())
+        } else {
+            Vehicle::new(params)
+        };
+        if let Err(e) = ardupilot::run(port, vehicle, mixer, rfly, status, &init) {
+            eprintln!("coptersim: ArduPilot mode failed: {e}");
             std::process::exit(1);
         }
         return;

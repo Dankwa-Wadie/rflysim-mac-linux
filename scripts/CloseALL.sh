@@ -3,7 +3,7 @@
 # RflySim3D, FlightGear started by RflyTools, and QGroundControl (keep it with --keep-qgc).
 set -u
 KEEP_QGC=0; [ "${1:-}" = --keep-qgc ] && KEEP_QGC=1
-names=(SITLRun.sh HITLRun.sh FlightGearDemo.sh coptersim rflysim3d "bin/px4( |$)" "fgfs.*F450|FlightGear.*F450")
+names=(SITLRun.sh HITLRun.sh APMSITLRun.sh FlightGearDemo.sh coptersim "build/sitl/bin/ardu" rflysim3d "bin/px4( |$)" "fgfs.*F450|FlightGear.*F450")
 [ $KEEP_QGC = 0 ] && names+=(QGroundControl)
 stopped=0
 for n in "${names[@]}"; do
