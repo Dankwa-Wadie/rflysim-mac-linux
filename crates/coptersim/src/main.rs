@@ -143,6 +143,10 @@ fn main() {
     let mut vehicle = Vehicle::new(params);
     init(&mut vehicle);
     let mut rfly = rfly;
+    // Cached result of the daily update check (no network access here).
+    if let Some(n) = rfly_update::notice() {
+        eprintln!("coptersim: {n}");
+    }
     let link = args.link.clone().unwrap_or_else(|| format!("tcpin:0.0.0.0:{}", 4560 + args.id - 1));
 
     if link.starts_with("tcpin:") {

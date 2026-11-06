@@ -1,0 +1,107 @@
+# Builds and tests every package, then creates a DRAFT release for a version tag (v1.2.3).
+# The maintainer signs and publishes it with scripts/publish_release.sh (the signing keys stay offline).
+# Run it by hand (Actions → Release → Run workflow) to build and test without creating a release.
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Icon tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q numpy opencv-python-headless
+      - name: Unit tests
+        run: cargo test --workspace
+      - name: Package (.pkg, universal)
+        run: RFLY_VENV="$RUNNER_TEMP/venv" scripts/package.sh
+      - name: Install test
+        run: |
+          VER=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          sudo installer -pkg "dist/RflyTools-$VER-macOS.pkg" -target /
+          test "$(ls -d /Applications/RflyTools/*.app | wc -l | tr -d ' ')" = 10
+          for c in coptersim rflysim3d rflygame rflygame-server rflygame-netem rfly-update rfly-sitlrun rfly-hitlrun rfly-python rfly-flightgear rfly-import-data; do command -v "$c"; done
+          test "$(rfly-update --version)" = "rfly-update $VER"
+          lipo -archs /Library/RflyTools/bin/coptersim | grep -q x86_64
+          coptersim --help >/dev/null
+          sudo /Library/RflyTools/uninstall.sh
+          test ! -e /Library/RflyTools
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/RflyTools-*-macOS.pkg
+          if-no-files-found: error
+
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: amd64
+          - runner: ubuntu-22.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev libasound2-dev pkg-config rsync python3-venv desktop-file-utils
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q numpy opencv-python-headless
+      - name: Unit tests
+        run: cargo test --workspace
+      - name: Package (.deb + .tar.gz)
+        run: RFLY_VENV="$RUNNER_TEMP/venv" scripts/package.sh
+      - name: Install tests (clean Ubuntu 24.04 and Debian 12 containers)
+        run: scripts/test_linux_packages.sh ubuntu:24.04:${{ matrix.arch }} debian:12:${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            dist/rflytools_*.deb
+            dist/rflytools-*-linux-*.tar.gz
+          if-no-files-found: error
+
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, linux]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Check the tag matches the version
+        run: |
+          VER=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          test "v$VER" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME but Cargo.toml says $VER"; exit 1; }
+          echo "VER=$VER" >> "$GITHUB_ENV"
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          ls -la
+          sha256sum RflyTools-$VER-macOS.pkg rflytools_${VER}_amd64.deb rflytools_${VER}_arm64.deb \
+            rflytools-$VER-linux-x86_64.tar.gz rflytools-$VER-linux-aarch64.tar.gz > SHA256SUMS.txt
+          sed "s/VERSION/$VER/g" ../packaging/release-notes.md > notes.md
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "RflyTools $VER" --notes-file notes.md \
+            RflyTools-$VER-macOS.pkg rflytools_${VER}_*.deb rflytools-$VER-linux-*.tar.gz SHA256SUMS.txt
+          echo "Draft created. Sign and publish it: scripts/publish_release.sh $GITHUB_REF_NAME"

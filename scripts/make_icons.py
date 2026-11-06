@@ -190,7 +190,23 @@ def icon_import():
     cv2.polylines(img, [np.array([[420, 1380], [420, 1680], [1628, 1680], [1628, 1380]], np.int32)], False, bgr((240, 242, 248)), 90, cv2.LINE_AA)
     return img
 
+def icon_update():
+    img = base((40, 120, 200), (20, 60, 130))
+    # Two circular arrows around a small quad: "update RflyTools".
+    for start, end in [(200, 340), (20, 160)]:
+        cv2.ellipse(img, (1024, 1000), (560, 560), 0, start, end, bgr((245, 248, 255)), 110, cv2.LINE_AA)
+    for ang in (340, 160):
+        a = np.deg2rad(ang)
+        tip = np.array([1024 + 560 * np.cos(a), 1000 + 560 * np.sin(a)])
+        d = np.array([-np.sin(a), np.cos(a)])          # tangent (direction of travel)
+        n = np.array([np.cos(a), np.sin(a)])           # outward normal
+        pts = np.array([tip + d * 170, tip - n * 150, tip + n * 150], np.int32)
+        cv2.fillPoly(img, [pts], bgr((245, 248, 255)), cv2.LINE_AA)
+    quad(img, 1024, 1000, 300, (120, 230, 170), (120, 230, 170), 40)
+    return img
+
 ICONS = {
+    "Update": icon_update,
     "ImportData": icon_import,
     "RflyGame": icon_game,
     "RflySim3D": icon_rflysim3d,

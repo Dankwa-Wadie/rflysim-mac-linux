@@ -1,0 +1,12 @@
+[package]
+name = "rfly-update"
+description = "Release update check, signature verification and installer for RflyTools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+sha2 = "0.10"
+base64 = "0.22"
+serde_json = "1"

@@ -45,7 +45,23 @@ The macOS package is not notarized yet. If macOS blocks it, right-click it and c
 (macOS), `sudo apt remove rflytools` (Debian/Ubuntu), `./install.sh --uninstall` (tarball).
 
 Commands after installing: `coptersim`, `rflysim3d`, `rflygame`, `rflygame-server`, `rfly-sitlrun`,
-`rfly-hitlrun`, `rfly-python` (Python38Env), `rfly-flightgear`, `rfly-import-data`.
+`rfly-hitlrun`, `rfly-python` (Python38Env), `rfly-flightgear`, `rfly-import-data`, `rfly-update`.
+
+### Keeping RflyTools up to date
+
+Once a day the tools check GitHub for a newer release. When there is one, RflyGame's menu shows *Update to
+RflyTools X*, RflySim3D's status bar and the command-line tools print a notice. Nothing installs by itself:
+
+```sh
+rfly-update            # show what is new and install it (asks first; macOS asks for your password)
+rfly-update --check    # just check
+rfly-update --disable  # turn the daily check off (or RFLY_NO_UPDATE_CHECK=1); --enable turns it back on
+```
+
+On Debian/Ubuntu the `.deb` also adds the RflyTools APT repository, so `sudo apt upgrade` updates it like any
+other package. Every update is signed: `rfly-update` installs only files whose checksums carry the RflyTools
+release signature, and apt checks the repository's signature. (Versions before 0.2.0 have no updater: install
+the new package once by hand.) How releases are made: [docs/RELEASING.md](docs/RELEASING.md).
 
 ### RflySim data
 

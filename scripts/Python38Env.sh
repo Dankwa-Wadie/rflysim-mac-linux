@@ -7,6 +7,8 @@
 #   scripts/Python38Env.sh my_script.py    # run a script with the env
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/scripts/platform.sh"
+rfly_update_notice
 VENV="${RFLY_VENV:-$HOME/tools/rflysim-py}"
 if [ ! -x "$VENV/bin/python" ]; then
   echo "Python38Env: creating $VENV ..."

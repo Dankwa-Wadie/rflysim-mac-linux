@@ -66,7 +66,7 @@ fn args() -> Args {
 fn window_conf() -> macroquad::conf::Conf {
     let a = args();
     let mq = Conf {
-        window_title: "RflySim3D (macOS)".into(),
+        window_title: format!("RflySim3D ({OS})"),
         window_width: a.width,
         window_height: a.height,
         high_dpi: false,
@@ -209,7 +209,11 @@ struct App {
     t0: f64,
     gps_origin: [f64; 3],
     rx_count: u64,
+    /// Newer RflyTools version from the background update check.
+    update: Option<String>,
 }
+
+const OS: &str = if cfg!(target_os = "macos") { "macOS" } else if cfg!(windows) { "Windows" } else { "Linux" };
 
 impl App {
     fn now(&self) -> f64 {
@@ -792,7 +796,7 @@ impl App {
         }
         draw_rectangle(0.0, 0.0, w, 26.0, Color::new(0.0, 0.0, 0.0, 0.45));
         let head = format!(
-            "RflySim3D (macOS)  window #{}  UDP {}  |  map {}  |  vehicles {}  sensors {}  |  view {:?}  |  {} fps{}",
+            "RflySim3D ({OS})  window #{}  UDP {}  |  map {}  |  vehicles {}  sensors {}  |  view {:?}  |  {} fps{}{}",
             self.window,
             UE4_BASE_PORT + self.window,
             self.map.name,
@@ -800,7 +804,8 @@ impl App {
             self.sensors.len(),
             self.cam.view,
             get_fps(),
-            if self.crash_detect { "  |  CRASH DETECT" } else { "" }
+            if self.crash_detect { "  |  CRASH DETECT" } else { "" },
+            self.update.as_ref().map(|v| format!("  |  RflyTools {v} available: rfly-update")).unwrap_or_default()
         );
         draw_text(&head, 8.0, 18.0, 20.0, WHITE);
         if let Some(v) = self.focus() {
@@ -869,7 +874,9 @@ async fn main() {
         t0: get_time(),
         gps_origin: [0.0; 3],
         rx_count: 0,
+        update: None,
     };
+    let update_rx = (a.screenshot.is_none() || std::env::var_os("RFLY_UPDATE_URL").is_some()).then(rfly_update::spawn_check);
     // A ground-fixed demo camera pose until a vehicle shows up.
     app.cam.free_pos = vec3(-12.0, -6.0, -6.0);
     loop {
@@ -877,6 +884,10 @@ async fn main() {
             break;
         }
         let dt = get_frame_time().min(0.1);
+        if let Some(v) = update_rx.as_ref().and_then(|r| r.try_recv().ok()) {
+            println!("rflysim3d: RflyTools {v} is available. Update with: rfly-update");
+            app.update = Some(v.to_string());
+        }
         app.drain();
         app.input(dt);
         app.update(dt);

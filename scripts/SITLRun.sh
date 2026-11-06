@@ -35,6 +35,7 @@ SIM="$(rfly_bin coptersim)"; VIEW="$(rfly_bin rflysim3d)"
 LOG="$(rfly_logs sitl)"; rfly_set_dbarg
 
 rfly_need_bins coptersim rflysim3d || exit 1
+rfly_update_notice
 [ -x "$PX4_BUILD/bin/px4" ] || { echo "PX4 SITL not found at $PX4_BUILD. Build PX4 once (see the README: \"PX4 SITL\"), or pass --px4 DIR."; exit 1; }
 
 if pgrep -f "bin/px4( |$)" >/dev/null || pgrep -x coptersim >/dev/null; then

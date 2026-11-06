@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libx11-6 libxi6 libxkbcommon0 libxcursor1 libxrandr2 libgl1 libegl1 libgl1-mesa-dri libglib2.0-0 \
       xvfb xauth \
       python3 python3-venv \
-      procps iproute2 lsof binutils desktop-file-utils rsync \
+      procps iproute2 lsof binutils desktop-file-utils rsync sudo apt-utils gnupg \
     && rm -rf /var/lib/apt/lists/*
 # PX4 builds from a source tree copied in by the test script; let git read it.
 RUN git config --system --add safe.directory '*'

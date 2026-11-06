@@ -24,6 +24,7 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
 | **Linux support** | ✅ Debian 12 arm64 container: test_all **A–G all PASS incl. PX4 v1.17 SITL**. `.desktop` launchers, tarball package |
 | **Installers** | ✅ macOS `.pkg` (universal); Linux `.deb` + tarball (amd64, arm64). Linux packages install-tested on Ubuntu 24.04 / Debian 12 |
 | **GitHub** | ✅ Public: github.com/Dankwa-Wadie/rflysim-mac-linux |
+| **Updates** | ✅ v0.2.0: daily check + `rfly-update` (signed), APT repo, CI release pipeline. Tested locally; CI first run pending |
 | GUI (vehicle configurator) | ⏳ |
 | Model-DLL ABI | ⏳ |
 
@@ -483,6 +484,37 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
   repo's dev copy (`RflyTools/`, same bundle ID), root-owned. pkgbuild bundles are relocatable by default.
   Fix: `pkgbuild --analyze` + component plist with `BundleIsRelocatable=false` (all 9 apps), and `xattr -cr` on the
   payload (it carried `._*` AppleDouble files). Version 0.1.1, commit `f356e8e`.
+
+## 2026-11-06 — Updates: a published release updates installed tools (v0.2.0)
+- User asked for updates pushed to installed tools when a release is published. Agreed design: ask, don't force;
+  sign everything; use apt on Debian; build releases in CI.
+- **`crates/rfly-update`** (lib + `rfly-update` CLI + maintainer-only `rfly-sign`):
+  - Daily check of `api.github.com/repos/Dankwa-Wadie/rflysim-mac-linux/releases/latest` via curl; state in the
+    tools data dir (`update-state.txt`); opt-out `rfly-update --disable`, RflyGame Settings, `RFLY_NO_UPDATE_CHECK`.
+  - Trust: `SHA256SUMS.txt.sig` = Ed25519 over `SHA256SUMS.txt`; public key built in (`release-keys.pub`); the
+    signed file names must carry a version newer than installed (blocks downgrade/metadata tricks); SHA-256 per file.
+  - Install by kind: macOS pkg (Installer via osascript admin prompt), Debian (`apt-get install --only-upgrade`
+    from the repo, else the verified .deb), tarball (unpack beside, swap folders, re-run install.sh, roll back on error).
+  - `RFLY_UPDATE_URL` points at a mock server for tests (safe: signature still required).
+- **Integration:** RflyGame main menu "Update to RflyTools X" (opens a terminal with rfly-update) + Settings toggle;
+  RflySim3D status bar notice (and it now says Linux on Linux); coptersim prints the cached notice; SITLRun/HITLRun/
+  Python38Env call `rfly-update --notice` (instant, background refresh). New "Update RflyTools" app + icon.
+- **Keys** (only on this Mac, `~/.config/rflytools-release/`, 0700): `release.key` (Ed25519, public
+  `k14o01qP…CJzo=`), `apt-signing.asc` (RSA 4096, fpr `4AF741528CC1E380EC6241DEFD907C72029452DF`).
+  Public APT keyring: `packaging/rflytools-archive-keyring.gpg` (shipped in the .deb).
+- **APT repository** (`scripts/build_apt_repo.sh`): gh-pages → https://dankwa-wadie.github.io/rflysim-mac-linux/apt,
+  `stable main`, amd64+arm64, InRelease/Release.gpg. The .deb adds `/etc/apt/sources.list.d/rflytools.list`
+  (unless REPO=no in /etc/default/rflytools) and removes it on uninstall. Depends now include curl.
+- **Release pipeline:** `.github/workflows/ci.yml` (unit tests, Linux + macOS), `release.yml` (tag → macOS pkg +
+  Linux debs/tarballs on native amd64/arm64 runners → install tests incl. a real `installer` run on macOS → draft
+  release). `scripts/publish_release.sh vX` verifies, signs, updates APT, publishes. Docs: `docs/RELEASING.md`.
+- **Tests:** `scripts/test_update.sh` (12, mock server: up to date, newer, notice, verified download, tampered,
+  foreign key, unsigned, version mismatch, downgrade, both opt-outs, offline) — PASS on macOS and Linux.
+  `scripts/test_update_linux.sh` (22, real 0.1.1 and 9.9.9 builds): tarball self-upgrade, APT source install,
+  signed repo, rfly-update → apt upgrade, foreign-key repo rejected, removal — PASS. Unit tests 42; test_all A/F PASS.
+- Bugs found: stale release binaries without the key (rebuilt); test harness quirks; apt lists missing in the
+  container; restricted `apt-get update` options warn on new apt (now a plain update).
+- Disk: deleted the colima VM + data (14 GB of rebuildable caches) and target/debug; recreated colima with 12 GB.
 
 ## Next steps
 0. When a licensed MATLAB is installed: run the RflyMac install + quicktest + example model. Fix anything MATLAB-specific.

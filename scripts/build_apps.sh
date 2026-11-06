@@ -130,6 +130,7 @@ app "SITLRun"             SITLRun         term "$ASK_N
 app "HITLRun"             HITLRun         term '"$ROOT/scripts/HITLRun.sh"'
 app "Python38Env"         Python38Env     term '"$ROOT/scripts/Python38Env.sh"'
 app "Import RflySim Data" ImportData      term '"$ROOT/scripts/import_rflysim_data.sh"'
+app "Update RflyTools"    Update          term '"$(rfly_bin rfly-update)"'
 [ "$PACKAGE" = 1 ] && { echo "RflyTools launchers staged in $OUT (for $LOUT)"; exit 0; }
 if [ "$RFLY_OS" = macos ]; then
   [ -d /Applications/QGroundControl.app ] && ln -sfn /Applications/QGroundControl.app "$OUT/QGroundControl.app"

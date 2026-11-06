@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["crates/rfly-core", "crates/rfly-db", "crates/rfly-proto", "crates/coptersim", "crates/rflysim3d", "crates/rflygame"]
+members = ["crates/rfly-core", "crates/rfly-db", "crates/rfly-proto", "crates/coptersim", "crates/rflysim3d", "crates/rflygame", "crates/rfly-update"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 

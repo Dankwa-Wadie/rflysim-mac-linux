@@ -31,6 +31,7 @@ fi
 SIM="$(rfly_bin coptersim)"; VIEW="$(rfly_bin rflysim3d)"
 LOG="$(rfly_logs hitl)"; rfly_set_dbarg
 rfly_need_bins coptersim rflysim3d || exit 1
+rfly_update_notice
 
 PIDS=()
 trap 'for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null; done; wait 2>/dev/null' EXIT INT TERM

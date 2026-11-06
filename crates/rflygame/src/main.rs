@@ -76,15 +76,25 @@ enum Screen {
     Lobby,
 }
 
+/// Newer RflyTools version found by the background update check (shown in the main menu).
+static UPDATE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+/// Index of the "Update" item in the main menu (after Quit, so the other indices stay fixed).
+const MENU_UPDATE: usize = 11;
+
 fn main_menu() -> Menu {
-    Menu::new(
-        "RflyGame",
-        "Fly the RflySim quad. Keyboard, mouse, gamepad or RC transmitter.",
-        ["Free Flight", "Racing", "Missions", "Flight School", "Play together", "Garage", "Leaderboards", "Replays", "Controls", "Settings", "Quit"]
-            .iter()
-            .map(|s| Item::Button(s.to_string()))
-            .collect(),
-    )
+    let mut items: Vec<Item> = ["Free Flight", "Racing", "Missions", "Flight School", "Play together", "Garage", "Leaderboards", "Replays", "Controls", "Settings", "Quit"]
+        .iter()
+        .map(|s| Item::Button(s.to_string()))
+        .collect();
+    let update = UPDATE.lock().ok().and_then(|u| u.clone());
+    if let Some(v) = &update {
+        items.push(Item::Button(format!("Update to RflyTools {v}")));
+    }
+    let sub = match &update {
+        Some(v) => format!("Update available: RflyTools {v} (you have {})", rfly_update::VERSION),
+        None => "Fly the RflySim quad. Keyboard, mouse, gamepad or RC transmitter.".to_string(),
+    };
+    Menu::new("RflyGame", &sub, items)
 }
 
 fn drone_names(d: &[DronePreset]) -> Vec<String> {
@@ -149,6 +159,7 @@ fn settings_menu(s: &Settings) -> Menu {
             Item::Choice("Crash behaviour".into(), vec!["Realistic: drone falls, you recover".into(), "Arcade: crash screen and reset".into()], s.crash_style as usize),
             Item::Choice("Keyboard layout".into(), vec!["Mode 2: W/S throttle, A/D yaw, arrows pitch/roll".into(), "Arcade: W/S/A/D move, arrows throttle/yaw".into()], if s.kb_mode2 { 0 } else { 1 }),
             Item::Number("Sound volume".into(), s.volume as f64, 0.0, 10.0, 1.0, ""),
+            Item::Toggle("Check for RflyTools updates daily".into(), rfly_update::enabled()),
             Item::Button("Back".into()),
         ],
     )
@@ -259,6 +270,8 @@ async fn main() {
     let shot_after: f32 = arg("--after").and_then(|v| v.parse().ok()).unwrap_or(3.0);
     let auto = arg("--auto"); // free | race | mission | school | host | join=ADDR
     let mut settings = Settings::load();
+    // Daily update check in the background (never during automated runs).
+    let update_rx = if (auto.is_none() && arg("--screenshot").is_none()) || std::env::var_os("RFLY_UPDATE_URL").is_some() { Some(rfly_update::spawn_check()) } else { None };
     if let Some(n) = arg("--name") {
         settings.player = n;
     }
@@ -443,6 +456,16 @@ async fn main() {
             b.poll();
         }
 
+        if let Some(v) = update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            if let Ok(mut u) = UPDATE.lock() {
+                *u = Some(v.to_string());
+            }
+            if matches!(screen, Screen::Main) {
+                let sel = menu.sel;
+                menu = main_menu();
+                menu.sel = sel;
+            }
+        }
         match &mut screen {
             Screen::Main => {
                 backdrop(&r, &bg_map, &bg_model, tt);
@@ -495,6 +518,11 @@ async fn main() {
                         screen = Screen::Settings;
                     }
                     MenuEvent::Activate(10) => break,
+                    MenuEvent::Activate(MENU_UPDATE) => {
+                        if let Err(e) = rfly_update::open_updater_terminal() {
+                            eprintln!("rflygame: {e}");
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -878,6 +906,9 @@ async fn main() {
                 settings.crash_style = menu.choice(8) as u8;
                 settings.kb_mode2 = menu.choice(9) == 0;
                 settings.volume = menu.number(10).round() as u8;
+                if menu.toggle(11) != rfly_update::enabled() {
+                    let _ = rfly_update::set_enabled(menu.toggle(11));
+                }
                 if let Some(s) = session.as_mut() {
                     s.realistic = settings.crash_style == 0;
                 }
@@ -886,7 +917,7 @@ async fn main() {
                     s.pilot.rates.expo = settings.expo;
                     s.pilot.rates.max_angle_deg = settings.max_angle_deg;
                 }
-                if matches!(ev, MenuEvent::Activate(11) | MenuEvent::Back) {
+                if matches!(ev, MenuEvent::Activate(12) | MenuEvent::Back) {
                     settings.save();
                     if session.is_some() {
                         screen = Screen::Playing;

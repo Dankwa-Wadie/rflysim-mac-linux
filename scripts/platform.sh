@@ -108,3 +108,12 @@ rfly_fg_aircraft() {
   done
   return 0
 }
+
+# Prints "RflyTools X is available" when the daily update check found a newer release (instant: cached;
+# the check itself runs in the background). Silent in a source checkout and when checks are disabled.
+rfly_update_notice() {
+  rfly_is_repo && return 0
+  local u; u="$(rfly_bin rfly-update)"
+  [ -x "$u" ] && "$u" --notice
+  return 0
+}

@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 VER="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
 DIST="$ROOT/dist"; mkdir -p "$DIST"
-BINS="coptersim rflysim3d rflygame rflygame-server rflygame-netem"
+BINS="coptersim rflysim3d rflygame rflygame-server rflygame-netem rfly-update"
 # Commands on PATH that run a script (symlinks would break the scripts' own ROOT lookup).
 WRAPPERS="rfly-sitlrun:SITLRun.sh rfly-hitlrun:HITLRun.sh rfly-python:Python38Env.sh rfly-flightgear:FlightGearF450.sh rfly-import-data:import_rflysim_data.sh"
 
@@ -176,7 +176,7 @@ Version: $VER
 Section: science
 Priority: optional
 Architecture: $DEB_ARCH
-Depends: libc6 (>= $GLIBC), libasound2t64 | libasound2 (>= 1.1), libudev1, libgl1, libx11-6, libxi6, libxkbcommon0, python3, python3-venv, libarchive-tools
+Depends: libc6 (>= $GLIBC), libasound2t64 | libasound2 (>= 1.1), libudev1, libgl1, libx11-6, libxi6, libxkbcommon0, python3, python3-venv, libarchive-tools, curl
 Recommends: x-terminal-emulator
 Suggests: flightgear
 Installed-Size: $(du -sk "$P/opt" | cut -f1)
@@ -188,12 +188,35 @@ Description: RflySim's tools for Linux and macOS (MATLAB-free)
  FlightGear-F450 output and the RflyMac Simulink package. RflySim's own data files
  are imported from the user's RflySim ISO with "Import RflySim Data".
 EOF
+# The RflyTools APT repository (GitHub Pages), so updates come with `apt upgrade`. Its signing key ships here.
+mkdir -p "$P/usr/share/keyrings"
+cp packaging/rflytools-archive-keyring.gpg "$P/usr/share/keyrings/rflytools-archive-keyring.gpg"
 cat >"$P/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
+# Adds the RflyTools APT repository (unless it is already configured, or an admin set REPO=no in
+# /etc/default/rflytools), so `apt upgrade` and `rfly-update` deliver new versions.
 set -e
+LIST=/etc/apt/sources.list.d/rflytools.list
+URL="https://dankwa-wadie.github.io/rflysim-mac-linux/apt"
+if [ "$1" = configure ]; then
+  REPO=yes; [ -f /etc/default/rflytools ] && . /etc/default/rflytools
+  if [ "$REPO" != no ] && [ ! -e "$LIST" ] && ! grep -rqs "dankwa-wadie.github.io/rflysim-mac-linux" /etc/apt/sources.list /etc/apt/sources.list.d/; then
+    printf '%s\n' "# RflyTools updates (added by the rflytools package; set REPO=no in /etc/default/rflytools to stop this)" \
+      "deb [signed-by=/usr/share/keyrings/rflytools-archive-keyring.gpg] $URL stable main" >"$LIST"
+  fi
+fi
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q /usr/share/applications || true
+exit 0
 EOF
-cp "$P/DEBIAN/postinst" "$P/DEBIAN/postrm"; chmod 755 "$P/DEBIAN/postinst" "$P/DEBIAN/postrm"
+cat >"$P/DEBIAN/postrm" <<'EOF'
+#!/bin/sh
+set -e
+# The keyring goes away with the package, so the source must too (apt would warn about a missing key).
+case "$1" in remove|purge) rm -f /etc/apt/sources.list.d/rflytools.list ;; esac
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q /usr/share/applications || true
+exit 0
+EOF
+chmod 755 "$P/DEBIAN/postinst" "$P/DEBIAN/postrm"
 DEB="$DIST/rflytools_${VER}_${DEB_ARCH}.deb"
 dpkg-deb --root-owner-group --build "$P" "$DEB" >/dev/null
 echo "Packaged: $DEB ($(du -h "$DEB" | cut -f1), glibc >= $GLIBC)"
@@ -208,7 +231,7 @@ cat >"$T/install.sh" <<'EOF'
 set -eu
 DIR="$(cd "$(dirname "$0")" && pwd)"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"; BIN="$HOME/.local/bin"
-CMDS="coptersim rflysim3d rflygame rflygame-server rflygame-netem"
+CMDS="coptersim rflysim3d rflygame rflygame-server rflygame-netem rfly-update"
 WRAP="rfly-sitlrun:SITLRun.sh rfly-hitlrun:HITLRun.sh rfly-python:Python38Env.sh rfly-flightgear:FlightGearF450.sh rfly-import-data:import_rflysim_data.sh"
 if [ "${1:-}" = --uninstall ]; then
   rm -f "$APPS"/rflytools-*.desktop
@@ -228,7 +251,8 @@ for w in $WRAP; do printf '#!/usr/bin/env sh\nexec "%s/scripts/%s" "$@"\n' "$DIR
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database -q "$APPS" || true
 echo "RflyTools installed from $DIR: app menu + commands in $BIN (add it to PATH if needed)."
 echo "Next: open 'Import RflySim Data' (or run rfly-import-data YOUR.iso)."
-echo "Runtime packages (Debian/Ubuntu): sudo apt install libasound2 libudev1 libgl1 libx11-6 libxi6 libxkbcommon0 python3-venv libarchive-tools"
+echo "Runtime packages (Debian/Ubuntu): sudo apt install libasound2 libudev1 libgl1 libx11-6 libxi6 libxkbcommon0 python3-venv libarchive-tools curl"
+echo "Updates: rfly-update (or the Update RflyTools menu entry) checks for and installs new versions."
 EOF
 chmod 755 "$T/install.sh"
 TGZ="$DIST/$NAME.tar.gz"

@@ -1,0 +1,3 @@
+# RflyTools release-signing public keys (Ed25519, base64). The private key stays with the maintainer
+# (scripts/publish_release.sh signs SHA256SUMS.txt with it). Add a new line here to rotate keys.
+k14o01qPY7cjiSYP6gEDMbx75j1TtQp9YR5TH4MCJzo=
