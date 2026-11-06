@@ -24,7 +24,7 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
 | **Linux support** | ✅ Debian 12 arm64 container: test_all **A–G all PASS incl. PX4 v1.17 SITL**. `.desktop` launchers, tarball package |
 | **Installers** | ✅ macOS `.pkg` (universal); Linux `.deb` + tarball (amd64, arm64). Linux packages install-tested on Ubuntu 24.04 / Debian 12 |
 | **GitHub** | ✅ Public: github.com/Dankwa-Wadie/rflysim-mac-linux |
-| **Updates** | ✅ v0.2.0: daily check + `rfly-update` (signed), APT repo, CI release pipeline. Tested locally; CI first run pending |
+| **Updates** | ✅ v0.2.0: daily check + `rfly-update` (signed), APT repo, CI release pipeline. CI green; tag v0.2.0 → draft release; publishing is the user's step |
 | GUI (vehicle configurator) | ⏳ |
 | Model-DLL ABI | ⏳ |
 
@@ -515,6 +515,20 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
 - Bugs found: stale release binaries without the key (rebuilt); test harness quirks; apt lists missing in the
   container; restricted `apt-get update` options warn on new apt (now a plain update).
 - Disk: deleted the colima VM + data (14 GB of rebuildable caches) and target/debug; recreated colima with 12 GB.
+
+## 2026-11-06 — CI live, v0.2.0 tagged
+- First GitHub Actions runs found: (1) `macos-14` runners are retired here ("configuration not supported") →
+  `macos-15`; (2) the Garage test needed ModelData.db (fresh clone) → skips without it; (3) the real-time
+  netcode test fails on starved shared runners (frames 50+ ms apart) → measures against real frame times and
+  skips when `CI` is set (still runs locally/test_all, max extra jump 0.11 m); (4) macOS arm64 runners sometimes
+  aren't available ("capacity constraints"); a re-run fixes it.
+- Release workflow dry run: Linux amd64 + arm64 jobs build and install-test on GitHub (Ubuntu 24.04, Debian 12).
+- Publish rehearsal with the CI-built 0.2.0 .debs: signed SHA256SUMS (verifies with the built-in key), APT repo built
+  in Docker exactly as publish_release.sh does, and a clean Ubuntu 24.04 installed rflytools 0.2.0 from it.
+- `rfly_docker_env` (platform.sh): Docker scripts start colima and bypass the stale Docker Desktop `credsStore`
+  without editing ~/.docker/config.json.
+- Tagged v0.2.0 → release workflow builds the draft. Publishing (`scripts/publish_release.sh v0.2.0`) is the user's.
+- Later: actions/checkout@v4 etc. target Node 20 (deprecated; GitHub runs them on Node 24 for now).
 
 ## Next steps
 0. When a licensed MATLAB is installed: run the RflyMac install + quicktest + example model. Fix anything MATLAB-specific.
