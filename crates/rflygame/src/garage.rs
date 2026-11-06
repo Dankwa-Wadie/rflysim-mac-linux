@@ -318,6 +318,11 @@ mod tests {
 
     #[test]
     fn garage_loads_catalog_and_builds_flyable_f450() {
+        // RflySim's ModelData.db is not in the repository (users import it); skip without it (fresh clone, CI).
+        if db_path().is_none() {
+            eprintln!("skipped: ModelData.db not found (scripts/import_rflysim_data.sh)");
+            return;
+        }
         let g = Garage::open();
         assert!(g.ok, "catalog loaded");
         assert_eq!(g.build.name, "DJI F450");
