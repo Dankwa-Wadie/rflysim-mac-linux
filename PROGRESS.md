@@ -23,6 +23,7 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
 | Hexa/Octo/Tri/Y6 frames | ⏳ Physics is quad only; the viewer draws hexa/octo/plane/car |
 | **Linux support** | ✅ Debian 12 arm64 container: test_all **A–G all PASS incl. PX4 v1.17 SITL**. `.desktop` launchers, tarball package |
 | **Installers** | ✅ macOS `.pkg` (universal); Linux `.deb` + tarball (amd64, arm64). Linux packages install-tested on Ubuntu 24.04 / Debian 12 |
+| **GitHub** | ✅ Public: github.com/Dankwa-Wadie/rflysim-mac-linux |
 | GUI (vehicle configurator) | ⏳ |
 | Model-DLL ABI | ⏳ |
 
@@ -452,6 +453,24 @@ Goal: a lightweight native macOS replacement for RflySim's **CopterSim** (simula
   (amd64 build image + cargo volume), trimmed the VM. Host free ~12 GB.
 - Note: `~/.docker/config.json` still has Docker Desktop's `credsStore: desktop` (breaks pulls); commands here used a
   session-local `DOCKER_CONFIG` + `DOCKER_HOST=unix://~/.colima/default/docker.sock` instead of editing it.
+
+## 2026-11-06 — Public GitHub repo, media, comparison with Windows RflySim
+- Repo: **https://github.com/Dankwa-Wadie/rflysim-mac-linux** (public, MIT, author Dankwa-Wadie with the GitHub
+  noreply address). Initial commit `1bda10e`, 115 files, 26 MB.
+- Public-repo cleanup (user's choices): RE notes trimmed to compatibility facts (no tooling, method or function
+  addresses), the MATLAB-installer note removed, RflySim's licensing not described. OSM data has an ODbL attribution file.
+- **Original Windows CopterSim captured under Wine**: Homebrew's Wine casks are all disabled (Gatekeeper), so
+  Debian's Wine 8 runs in an amd64 container (colima + Rosetta) on Xvfb. CopterSim.exe (64-bit Qt5) starts and
+  shows its configurator with RflySim's catalog. **3DDisplay.exe is 32-bit**: Rosetta's Linux mode runs only
+  x86_64 and Debian's Wine 10 still needs wine32:i386 (no new-WoW64), so it can't run here. RflySim3D is not on
+  the ISO. Both are described and linked instead. Originals are unpacked in `~/tools/rflysim-wine` (not in the repo).
+- **Frame recorder** (`rflysim3d::record`): `RFLY_RECORD=DIR` (+ `_FPS`, `_SECS`, `_AFTER`) writes the app's own
+  frames as JPEGs from a background thread; hooked into rflysim3d and every RflyGame render loop. Used instead of
+  screen capture, which would include the user's desktop.
+- Media (`docs/media`, 20 MB): PX4 SITL offboard flight in rflysim3d, RflyGame FPV City Slalom, chase Raceway GP,
+  3-pilot split screen (MP4 + README GIFs ≤ 4 MB), stills, Python camera image, bdsim scope, original CopterSim.
+- `docs/COMPARISON.md`: Windows RflySim vs this project (systems, size, activation, PX4, MATLAB, each tool).
+- README: showcase GIFs at the top, installed command names, Releases link.
 
 ## Next steps
 0. When a licensed MATLAB is installed: run the RflyMac install + quicktest + example model. Fix anything MATLAB-specific.
